@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store/useAppStore'
 
 export const LoginScreen: React.FC = () => {
+	const { t } = useTranslation()
 	const { login, signup, error } = useAppStore()
 	const [isSignup, setIsSignup] = useState(false)
 	const [email, setEmail] = useState('')
@@ -22,33 +24,27 @@ export const LoginScreen: React.FC = () => {
 		setSuccessMsg(null)
 
 		if (!email || !password) {
-			setLocalError('Compila tutti i campi obbligatori')
+			setLocalError(t('login.errorFillAll'))
 			return
 		}
 
 		try {
 			if (isSignup) {
 				if (!username || !displayName) {
-					setLocalError(
-						'Username e Nome Visualizzato sono richiesti per la registrazione'
-					)
+					setLocalError(t('login.errorUsernameRequired'))
 					return
 				}
-				// Validazione formati semplici
 				if (username.includes(' ') || username.startsWith('@')) {
-					setLocalError(
-						"L'username non deve contenere spazi e non deve iniziare con @ (verrà aggiunto in automatico)"
-					)
+					setLocalError(t('login.errorUsernameFormat'))
 					return
 				}
 				await signup(email, password, username.toLowerCase(), displayName, age, playerType)
-				setSuccessMsg('Registrazione avvenuta con successo!')
+				setSuccessMsg(t('login.successRegister'))
 			} else {
 				await login(email, password)
 			}
 		} catch (err: any) {
-			// Gli errori sono catturati dallo store, ma mostriamo feedback locale
-			setLocalError(err.message || 'Operazione fallita. Riprova.')
+			setLocalError(err.message || t('login.errorGeneric'))
 		}
 	}
 
@@ -62,9 +58,7 @@ export const LoginScreen: React.FC = () => {
 					</div>
 					<h1 className="text-2xl font-bold tracking-tight text-white mb-1">RankPong</h1>
 					<p className="text-xs text-slate-400">
-						{isSignup
-							? 'Crea il tuo profilo giocatore'
-							: 'Accedi al ranking della community'}
+						{isSignup ? t('login.titleRegister') : t('login.titleLogin')}
 					</p>
 				</div>
 
@@ -112,12 +106,12 @@ export const LoginScreen: React.FC = () => {
 					<div className="form-control">
 						<label className="label py-1">
 							<span className="label-text text-xs text-slate-300 font-medium">
-								Email
+								{t('login.emailLabel')}
 							</span>
 						</label>
 						<input
 							type="email"
-							placeholder="giocatore@esempio.com"
+							placeholder={t('login.emailPlaceholder')}
 							className="input input-bordered input-sm w-full bg-slate-800 text-white focus:input-primary"
 							value={email}
 							onChange={e => setEmail(e.target.value)}
@@ -128,12 +122,12 @@ export const LoginScreen: React.FC = () => {
 					<div className="form-control">
 						<label className="label py-1">
 							<span className="label-text text-xs text-slate-300 font-medium">
-								Password
+								{t('login.passwordLabel')}
 							</span>
 						</label>
 						<input
 							type="password"
-							placeholder="••••••••"
+							placeholder={t('login.passwordPlaceholder')}
 							className="input input-bordered input-sm w-full bg-slate-800 text-white focus:input-primary"
 							value={password}
 							onChange={e => setPassword(e.target.value)}
@@ -146,12 +140,12 @@ export const LoginScreen: React.FC = () => {
 							<div className="form-control">
 								<label className="label py-1">
 									<span className="label-text text-xs text-slate-300 font-medium">
-										Username (senza spazi o @)
+										{t('login.usernameLabel')}
 									</span>
 								</label>
 								<input
 									type="text"
-									placeholder="es. marco_topspin"
+									placeholder={t('login.usernamePlaceholder')}
 									className="input input-bordered input-sm w-full bg-slate-800 text-white focus:input-primary"
 									value={username}
 									onChange={e => setUsername(e.target.value)}
@@ -162,12 +156,12 @@ export const LoginScreen: React.FC = () => {
 							<div className="form-control">
 								<label className="label py-1">
 									<span className="label-text text-xs text-slate-300 font-medium">
-										Nome e Cognome / Soprannome
+										{t('login.displayNameLabel')}
 									</span>
 								</label>
 								<input
 									type="text"
-									placeholder="es. Marco Rossi"
+									placeholder={t('login.displayNamePlaceholder')}
 									className="input input-bordered input-sm w-full bg-slate-800 text-white focus:input-primary"
 									value={displayName}
 									onChange={e => setDisplayName(e.target.value)}
@@ -179,7 +173,7 @@ export const LoginScreen: React.FC = () => {
 								<div className="form-control">
 									<label className="label py-1">
 										<span className="label-text text-xs text-slate-300 font-medium">
-											Età
+											{t('login.ageLabel')}
 										</span>
 									</label>
 									<input
@@ -196,7 +190,7 @@ export const LoginScreen: React.FC = () => {
 								<div className="form-control">
 									<label className="label py-1">
 										<span className="label-text text-xs text-slate-300 font-medium">
-											Livello Giocatore
+											{t('login.playerLevelLabel')}
 										</span>
 									</label>
 									<select
@@ -204,9 +198,11 @@ export const LoginScreen: React.FC = () => {
 										value={playerType}
 										onChange={e => setPlayerType(e.target.value as any)}
 									>
-										<option value="amateur">Amatore</option>
-										<option value="competitive">Agonista</option>
-										<option value="student">Studente</option>
+										<option value="amateur">{t('playerType.amateur')}</option>
+										<option value="competitive">
+											{t('playerType.competitive')}
+										</option>
+										<option value="student">{t('playerType.student')}</option>
 									</select>
 								</div>
 							</div>
@@ -217,12 +213,12 @@ export const LoginScreen: React.FC = () => {
 						type="submit"
 						className="btn btn-primary btn-sm w-full mt-6 text-white font-bold uppercase tracking-wider"
 					>
-						{isSignup ? 'Registrati' : 'Accedi'}
+						{isSignup ? t('login.registerButton') : t('login.loginButton')}
 					</button>
 				</form>
 
 				{/* Pulsante Switch Login/Signup */}
-				<div className="divider text-xs text-slate-500 my-4">OPPURE</div>
+				<div className="divider text-xs text-slate-500 my-4">{t('login.or')}</div>
 
 				<button
 					onClick={() => {
@@ -232,7 +228,7 @@ export const LoginScreen: React.FC = () => {
 					}}
 					className="btn btn-outline btn-sm w-full text-xs hover:btn-primary"
 				>
-					{isSignup ? 'Hai già un account? Accedi' : 'Nuovo utente? Crea un account'}
+					{isSignup ? t('login.hasAccount') : t('login.noAccount')}
 				</button>
 			</div>
 		</div>

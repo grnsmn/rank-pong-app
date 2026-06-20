@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { dbService, type Profile } from '../services/db'
 import { Trophy, Medal, Search, User } from 'lucide-react'
 
 export const LeaderboardScreen: React.FC = () => {
+	const { t } = useTranslation()
 	const [profiles, setProfiles] = useState<Profile[]>([])
 	const [search, setSearch] = useState('')
 	const [isLoading, setIsLoading] = useState(true)
@@ -37,19 +39,19 @@ export const LeaderboardScreen: React.FC = () => {
 			case 'competitive':
 				return (
 					<span className="badge badge-error badge-xs text-white uppercase font-bold py-1.5 px-2">
-						Agonista
+						{t('playerType.competitive')}
 					</span>
 				)
 			case 'student':
 				return (
 					<span className="badge badge-info badge-xs text-white uppercase font-bold py-1.5 px-2">
-						Studente
+						{t('playerType.student')}
 					</span>
 				)
 			default:
 				return (
 					<span className="badge badge-success badge-xs text-white uppercase font-bold py-1.5 px-2">
-						Amatore
+						{t('playerType.amateur')}
 					</span>
 				)
 		}
@@ -79,11 +81,9 @@ export const LeaderboardScreen: React.FC = () => {
 		<div className="flex flex-col h-full bg-base-100 text-white">
 			<div className="px-4 pt-6 pb-2">
 				<h2 className="text-xl font-bold tracking-tight text-white mb-1">
-					Classifica Generale
+					{t('leaderboard.title')}
 				</h2>
-				<p className="text-xs text-slate-400">
-					Calcolo ranking in tempo reale basato su algoritmo Elo
-				</p>
+				<p className="text-xs text-slate-400">{t('leaderboard.subtitle')}</p>
 			</div>
 
 			<div className="px-4 py-2">
@@ -91,7 +91,7 @@ export const LeaderboardScreen: React.FC = () => {
 					<Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
 					<input
 						type="text"
-						placeholder="Cerca giocatore..."
+						placeholder={t('leaderboard.searchPlaceholder')}
 						className="input input-bordered input-sm w-full pl-9 bg-slate-800 text-white focus:input-primary"
 						value={search}
 						onChange={e => setSearch(e.target.value)}
@@ -105,7 +105,7 @@ export const LeaderboardScreen: React.FC = () => {
 				</div>
 			) : filteredProfiles.length === 0 ? (
 				<div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400">
-					<p className="text-sm">Nessun giocatore registrato o trovato.</p>
+					<p className="text-sm">{t('leaderboard.empty')}</p>
 				</div>
 			) : (
 				<div className="flex-1 overflow-y-auto px-4 pb-24 space-y-4">
@@ -237,16 +237,17 @@ export const LeaderboardScreen: React.FC = () => {
 												{getPlayerTypeBadge(player.player_type)}
 											</div>
 											<div className="text-[10px] text-slate-400 truncate">
-												@{player.username} • {player.age} anni
+												@{player.username} • {player.age}{' '}
+												{t('common.years')}
 											</div>
 										</div>
 									</div>
 									<div className="flex flex-col items-end shrink-0">
 										<span className="text-sm font-extrabold text-primary">
-											{player.elo_rating} ELO
+											{player.elo_rating} {t('common.elo')}
 										</span>
 										<span className="text-[9px] text-slate-500">
-											punti ranking
+											{t('leaderboard.rankingPoints')}
 										</span>
 									</div>
 								</div>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from './store/useAppStore'
 import { isSupabaseConfigured } from './supabaseClient'
 import { dbService } from './services/db'
@@ -14,6 +15,7 @@ import { ProfileScreen } from './screen/ProfileScreen'
 import { Trophy, History, PlusCircle, User, Info } from 'lucide-react'
 
 export const App: React.FC = () => {
+	const { t } = useTranslation()
 	const { currentUser, initialize, isLoading } = useAppStore()
 	const [activeTab, setActiveTab] = useState<'leaderboard' | 'matches' | 'new-match' | 'profile'>(
 		'leaderboard'
@@ -53,7 +55,7 @@ export const App: React.FC = () => {
 			<div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-white">
 				<span className="loading loading-spinner loading-lg text-primary mb-4"></span>
 				<h2 className="text-sm font-bold tracking-widest uppercase text-slate-400">
-					Caricamento RankPong...
+					{t('app.loading')}
 				</h2>
 			</div>
 		)
@@ -85,16 +87,15 @@ export const App: React.FC = () => {
 					<div className="flex items-center gap-2">
 						<Info className="w-4 h-4 shrink-0" />
 						<span>
-							<strong>Modalità Demo attiva:</strong> i dati sono salvati in locale.
-							Inserisci le chiavi in un file <code>.env</code> per connettere
-							Supabase.
+							<strong>{t('app.demoActive')}</strong> {t('app.demoDescription')}{' '}
+							<code>{t('app.demoFile')}</code> {t('app.demoSuffix')}
 						</span>
 					</div>
 					<button
 						onClick={() => setHideBanner(true)}
 						className="btn btn-ghost btn-xs text-white p-0 min-h-0 h-auto hover:bg-transparent ml-2 underline shrink-0 font-bold"
 					>
-						Nascondi
+						{t('app.demoHide')}
 					</button>
 				</div>
 			)}
@@ -114,7 +115,7 @@ export const App: React.FC = () => {
 						<Trophy
 							className={`w-5 h-5 ${activeTab === 'leaderboard' ? 'fill-primary/10' : ''}`}
 						/>
-						<span className="text-[10px] font-bold mt-1">Classifica</span>
+						<span className="text-[10px] font-bold mt-1">{t('nav.leaderboard')}</span>
 					</button>
 
 					<button
@@ -126,7 +127,7 @@ export const App: React.FC = () => {
 						}`}
 					>
 						<History className="w-5 h-5" />
-						<span className="text-[10px] font-bold mt-1">Partite</span>
+						<span className="text-[10px] font-bold mt-1">{t('nav.matches')}</span>
 						{pendingCount > 0 && (
 							<span className="absolute top-0 right-5 badge badge-error badge-xs text-white font-black w-4 h-4 flex items-center justify-center p-0.5 text-[8px] animate-pulse">
 								{pendingCount}
@@ -145,7 +146,7 @@ export const App: React.FC = () => {
 						<PlusCircle
 							className={`w-5 h-5 ${activeTab === 'new-match' ? 'fill-primary/10' : ''}`}
 						/>
-						<span className="text-[10px] font-bold mt-1">Nuova Sfida</span>
+						<span className="text-[10px] font-bold mt-1">{t('nav.newMatch')}</span>
 					</button>
 
 					<button
@@ -159,7 +160,7 @@ export const App: React.FC = () => {
 						<User
 							className={`w-5 h-5 ${activeTab === 'profile' ? 'fill-primary/10' : ''}`}
 						/>
-						<span className="text-[10px] font-bold mt-1">Profilo</span>
+						<span className="text-[10px] font-bold mt-1">{t('nav.profile')}</span>
 					</button>
 				</div>
 			</div>

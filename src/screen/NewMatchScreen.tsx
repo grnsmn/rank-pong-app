@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { dbService, type Profile } from '../services/db'
 import { useAppStore } from '../store/useAppStore'
 import { AlertTriangle, CheckCircle2 } from 'lucide-react'
@@ -9,6 +10,7 @@ interface SetInput {
 }
 
 export const NewMatchScreen: React.FC = () => {
+	const { t } = useTranslation()
 	const { currentUser } = useAppStore()
 	const [profiles, setProfiles] = useState<Profile[]>([])
 	const [opponentId, setOpponentId] = useState('')
@@ -37,28 +39,16 @@ export const NewMatchScreen: React.FC = () => {
 		score2: number
 	): { isValid: boolean; winner: 1 | 2 | null; error?: string } => {
 		if (isNaN(score1) || isNaN(score2) || score1 < 0 || score2 < 0) {
-			return {
-				isValid: false,
-				winner: null,
-				error: 'I punteggi devono essere numeri positivi',
-			}
+			return { isValid: false, winner: null, error: t('newMatch.errorPositive') }
 		}
 
 		if (score1 < 11 && score2 < 11) {
-			return {
-				isValid: false,
-				winner: null,
-				error: 'Almeno un giocatore deve raggiungere 11 punti',
-			}
+			return { isValid: false, winner: null, error: t('newMatch.errorMin11') }
 		}
 
 		const diff = Math.abs(score1 - score2)
 		if (diff < 2) {
-			return {
-				isValid: false,
-				winner: null,
-				error: 'Il set deve terminare con almeno 2 punti di scarto (es. 11-9 o 12-10)',
-			}
+			return { isValid: false, winner: null, error: t('newMatch.errorMargin') }
 		}
 
 		if (score1 >= 11 && score1 - score2 >= 2) {
@@ -66,7 +56,7 @@ export const NewMatchScreen: React.FC = () => {
 				return {
 					isValid: false,
 					winner: null,
-					error: `Punteggio non valido: sul 10-10 si vince con 2 punti di scarto (es. ${score2 + 2}-${score2})`,
+					error: t('newMatch.errorTiebreak', { example: `${score2 + 2}-${score2}` }),
 				}
 			}
 			return { isValid: true, winner: 1 }
@@ -77,7 +67,7 @@ export const NewMatchScreen: React.FC = () => {
 				return {
 					isValid: false,
 					winner: null,
-					error: `Punteggio non valido: sul 10-10 si vince con 2 punti di scarto (es. ${score1 + 2}-${score1})`,
+					error: t('newMatch.errorTiebreak', { example: `${score1 + 2}-${score1}` }),
 				}
 			}
 			return { isValid: true, winner: 2 }
@@ -104,7 +94,7 @@ export const NewMatchScreen: React.FC = () => {
 			const val = validateSet(s1, s2)
 			if (!val.isValid) {
 				allSetsValid = false
-				if (val.error) errors.push(`Set ${index + 1}: ${val.error}`)
+				if (val.error) errors.push(`${t('common.set')} ${index + 1}: ${val.error}`)
 			} else {
 				if (val.winner === 1) setsWonP1++
 				if (val.winner === 2) setsWonP2++
@@ -179,12 +169,12 @@ export const NewMatchScreen: React.FC = () => {
 		setSuccessMsg(null)
 
 		if (!opponentId) {
-			setErrorMsg('Seleziona un avversario')
+			setErrorMsg(t('newMatch.errorNoOpponent'))
 			return
 		}
 
 		if (!status.canSubmit) {
-			setErrorMsg('Il punteggio inserito non è valido o il match non è concluso.')
+			setErrorMsg(t('newMatch.errorInvalidScore'))
 			return
 		}
 
@@ -198,13 +188,11 @@ export const NewMatchScreen: React.FC = () => {
 
 			await dbService.createMatch(currentUser?.id || '', opponentId, bestOf, formattedScores)
 
-			setSuccessMsg(
-				'Match registrato con successo! Attendi la conferma del tuo avversario per aggiornare il ranking.'
-			)
+			setSuccessMsg(t('newMatch.successSubmit'))
 			setOpponentId('')
 			setSets([{ score1: '', score2: '' }])
 		} catch (err: any) {
-			setErrorMsg(err.message || 'Errore durante il salvataggio del match.')
+			setErrorMsg(err.message || t('newMatch.errorSave'))
 		} finally {
 			setIsLoading(false)
 		}
@@ -216,11 +204,9 @@ export const NewMatchScreen: React.FC = () => {
 		<div className="flex flex-col h-full bg-base-100 text-white">
 			<div className="px-4 pt-6 pb-2">
 				<h2 className="text-xl font-bold tracking-tight text-white mb-1">
-					Registra Partita
+					{t('newMatch.title')}
 				</h2>
-				<p className="text-xs text-slate-400">
-					Inserisci i punteggi. L'avversario dovrà confermare il risultato.
-				</p>
+				<p className="text-xs text-slate-400">{t('newMatch.subtitle')}</p>
 			</div>
 
 			<div className="flex-1 overflow-y-auto px-4 pb-24">
@@ -228,7 +214,7 @@ export const NewMatchScreen: React.FC = () => {
 					<div className="form-control w-full p-4 rounded-2xl bg-neutral border border-slate-800">
 						<label className="label py-1">
 							<span className="label-text text-xs text-slate-300 font-bold">
-								1. SELEZIONA L'AVVERSARIO
+								{t('newMatch.stepOpponent')}
 							</span>
 						</label>
 						<select
@@ -237,10 +223,11 @@ export const NewMatchScreen: React.FC = () => {
 							onChange={e => setOpponentId(e.target.value)}
 							required
 						>
-							<option value="">-- Scegli giocatore --</option>
+							<option value="">{t('newMatch.opponentPlaceholder')}</option>
 							{profiles.map(p => (
 								<option key={p.id} value={p.id}>
-									{p.display_name} (@{p.username}) - {p.elo_rating} ELO
+									{p.display_name} (@{p.username}) - {p.elo_rating}{' '}
+									{t('common.elo')}
 								</option>
 							))}
 						</select>
@@ -249,7 +236,7 @@ export const NewMatchScreen: React.FC = () => {
 					<div className="p-4 rounded-2xl bg-neutral border border-slate-800">
 						<label className="label py-0 mb-2">
 							<span className="label-text text-xs text-slate-300 font-bold">
-								2. FORMATO DEL MATCH
+								{t('newMatch.stepFormat')}
 							</span>
 						</label>
 						<div className="flex gap-2">
@@ -258,20 +245,20 @@ export const NewMatchScreen: React.FC = () => {
 								onClick={() => handleBestOfChange(3)}
 								className={`flex-1 btn btn-sm font-bold text-xs uppercase ${bestOf === 3 ? 'btn-primary text-white' : 'btn-outline border-slate-700'}`}
 							>
-								Al meglio di 3 set
+								{t('newMatch.bestOf3Label')}
 							</button>
 							<button
 								type="button"
 								onClick={() => handleBestOfChange(5)}
 								className={`flex-1 btn btn-sm font-bold text-xs uppercase ${bestOf === 5 ? 'btn-primary text-white' : 'btn-outline border-slate-700'}`}
 							>
-								Al meglio di 5 set
+								{t('newMatch.bestOf5Label')}
 							</button>
 						</div>
 						<p className="text-[10px] text-slate-500 mt-2 text-center">
 							{bestOf === 3
-								? 'Vince chi si aggiudica 2 set (fino a 3 set giocabili)'
-								: 'Vince chi si aggiudica 3 set (fino a 5 set giocabili)'}
+								? t('newMatch.bestOf3Description')
+								: t('newMatch.bestOf5Description')}
 						</p>
 					</div>
 
@@ -279,10 +266,11 @@ export const NewMatchScreen: React.FC = () => {
 						<div className="p-4 rounded-2xl bg-neutral border border-slate-800 space-y-4">
 							<div className="flex justify-between items-center pb-2 border-b border-slate-800">
 								<span className="text-xs font-bold text-slate-300">
-									3. PUNTEGGI DEI SET
+									{t('newMatch.stepScores')}
 								</span>
 								<span className="text-[10px] text-slate-500 font-semibold uppercase">
-									Tu vs {selectedOpponent?.display_name.split(' ')[0]}
+									{t('newMatch.youVs')}{' '}
+									{selectedOpponent?.display_name.split(' ')[0]}
 								</span>
 							</div>
 
@@ -298,13 +286,13 @@ export const NewMatchScreen: React.FC = () => {
 											className="flex items-center gap-3 bg-slate-950/40 p-2.5 rounded-xl border border-slate-850"
 										>
 											<span className="text-xs font-black text-slate-400 w-12 shrink-0">
-												SET {index + 1}
+												{t('common.set')} {index + 1}
 											</span>
 
 											<input
 												type="text"
 												pattern="\d*"
-												placeholder="Tu"
+												placeholder={t('common.you')}
 												className="input input-bordered input-sm w-full bg-slate-800 text-center font-bold text-white text-sm focus:input-primary"
 												value={set.score1}
 												onChange={e =>
@@ -320,7 +308,7 @@ export const NewMatchScreen: React.FC = () => {
 											<input
 												type="text"
 												pattern="\d*"
-												placeholder="Avv."
+												placeholder={t('common.opponent')}
 												className="input input-bordered input-sm w-full bg-slate-800 text-center font-bold text-white text-sm focus:input-primary"
 												value={set.score2}
 												onChange={e =>
@@ -337,12 +325,12 @@ export const NewMatchScreen: React.FC = () => {
 															className={`text-[10px] font-black uppercase ${setVal.winner === 1 ? 'text-success' : 'text-error'}`}
 														>
 															{setVal.winner === 1
-																? 'Vinto'
-																: 'Perso'}
+																? t('common.won')
+																: t('common.lost')}
 														</span>
 													) : (
 														<span className="text-[9px] text-warning font-semibold">
-															Non valido
+															{t('common.invalid')}
 														</span>
 													))}
 											</div>
@@ -358,7 +346,7 @@ export const NewMatchScreen: React.FC = () => {
 										onClick={addSetRow}
 										className="btn btn-outline btn-sm btn-primary flex-1 text-xs font-bold"
 									>
-										Set Successivo
+										{t('newMatch.nextSet')}
 									</button>
 								)}
 								{sets.length > 1 && (
@@ -366,9 +354,9 @@ export const NewMatchScreen: React.FC = () => {
 										type="button"
 										onClick={removeLastSetRow}
 										className="btn btn-outline btn-error btn-sm text-xs font-bold w-12"
-										title="Rimuovi ultimo set"
+										title={t('newMatch.removeLastSet')}
 									>
-										Rimuovi
+										{t('newMatch.removeSet')}
 									</button>
 								)}
 							</div>
@@ -378,7 +366,7 @@ export const NewMatchScreen: React.FC = () => {
 					{status.errors.length > 0 && opponentId !== '' && (
 						<div className="p-3 bg-warning/10 border border-warning/20 text-warning rounded-xl text-xs space-y-1">
 							<div className="flex items-center gap-1.5 font-bold mb-1">
-								<AlertTriangle className="w-4 h-4" /> Correggi i punteggi dei set:
+								<AlertTriangle className="w-4 h-4" /> {t('newMatch.scoreErrors')}
 							</div>
 							{status.errors.map((err, i) => (
 								<div key={i}>• {err}</div>
@@ -389,14 +377,15 @@ export const NewMatchScreen: React.FC = () => {
 					{opponentId !== '' && (
 						<div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
 							<div className="flex justify-between items-center text-xs">
-								<span>Set vinti da te:</span>
+								<span>{t('newMatch.yourSets')}</span>
 								<span className="font-extrabold text-success">
 									{status.setsWonP1}
 								</span>
 							</div>
 							<div className="flex justify-between items-center text-xs">
 								<span>
-									Set vinti da {selectedOpponent?.display_name.split(' ')[0]}:
+									{t('newMatch.opponentSets')}{' '}
+									{selectedOpponent?.display_name.split(' ')[0]}:
 								</span>
 								<span className="font-extrabold text-error">
 									{status.setsWonP2}
@@ -404,20 +393,23 @@ export const NewMatchScreen: React.FC = () => {
 							</div>
 
 							<div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-								<span className="text-xs font-bold">Stato Match:</span>
+								<span className="text-xs font-bold">
+									{t('newMatch.matchStatus')}
+								</span>
 								{status.matchFinished ? (
 									status.excessSets ? (
 										<span className="text-xs text-error font-extrabold">
-											Set in eccesso
+											{t('newMatch.statusExcess')}
 										</span>
 									) : (
 										<span className="text-xs text-success font-black flex items-center gap-1">
-											<CheckCircle2 className="w-4 h-4" /> Pronto all'invio
+											<CheckCircle2 className="w-4 h-4" />{' '}
+											{t('newMatch.statusReady')}
 										</span>
 									)
 								) : (
 									<span className="text-xs text-yellow-500 font-bold">
-										In corso (mancano set)
+										{t('newMatch.statusInProgress')}
 									</span>
 								)}
 							</div>
@@ -443,7 +435,7 @@ export const NewMatchScreen: React.FC = () => {
 						disabled={!status.canSubmit || isLoading}
 						className={`btn btn-primary w-full text-white font-bold uppercase tracking-wider ${isLoading ? 'loading' : ''}`}
 					>
-						Invia per la Conferma
+						{t('newMatch.submitButton')}
 					</button>
 				</form>
 			</div>
