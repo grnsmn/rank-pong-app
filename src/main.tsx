@@ -6,11 +6,11 @@ import { registerSW } from 'virtual:pwa-register'
 
 // Registrazione automatica del service worker per supportare offline e installazione
 if ('serviceWorker' in navigator) {
-  registerSW({ immediate: true })
+	registerSW({ immediate: true })
 }
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
+	<StrictMode>
+		<App />
+	</StrictMode>
 )
