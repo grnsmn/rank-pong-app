@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { dbService, type Profile } from '../services/db'
 import { useAppStore } from '../store/useAppStore'
-import { AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Check } from 'lucide-react'
 
 interface SetInput {
 	score1: string
@@ -14,6 +14,9 @@ export const NewMatchScreen: React.FC = () => {
 	const { currentUser } = useAppStore()
 	const [profiles, setProfiles] = useState<Profile[]>([])
 	const [opponentId, setOpponentId] = useState('')
+	const [opponentSearch, setOpponentSearch] = useState('')
+	const [showOpponentDropdown, setShowOpponentDropdown] = useState(false)
+	const opponentRef = useRef<HTMLDivElement>(null)
 	const [bestOf, setBestOf] = useState<3 | 5>(3)
 
 	const [sets, setSets] = useState<SetInput[]>([{ score1: '', score2: '' }])
@@ -200,6 +203,21 @@ export const NewMatchScreen: React.FC = () => {
 
 	const selectedOpponent = profiles.find(p => p.id === opponentId)
 
+	const filteredProfiles = profiles.filter(p => {
+		const q = opponentSearch.toLowerCase()
+		return p.display_name.toLowerCase().includes(q) || p.username.toLowerCase().includes(q)
+	})
+
+	useEffect(() => {
+		const handleClickOutside = (e: MouseEvent) => {
+			if (opponentRef.current && !opponentRef.current.contains(e.target as Node)) {
+				setShowOpponentDropdown(false)
+			}
+		}
+		document.addEventListener('mousedown', handleClickOutside)
+		return () => document.removeEventListener('mousedown', handleClickOutside)
+	}, [])
+
 	return (
 		<div className="flex flex-col h-full bg-base-100 text-white">
 			<div className="px-4 pt-6 pb-2">
@@ -217,20 +235,56 @@ export const NewMatchScreen: React.FC = () => {
 								{t('newMatch.stepOpponent')}
 							</span>
 						</label>
-						<select
-							className="select select-bordered select-sm w-full bg-slate-800 text-white mt-1 focus:select-primary"
-							value={opponentId}
-							onChange={e => setOpponentId(e.target.value)}
-							required
-						>
-							<option value="">{t('newMatch.opponentPlaceholder')}</option>
-							{profiles.map(p => (
-								<option key={p.id} value={p.id}>
-									{p.display_name} (@{p.username}) - {p.elo_rating}{' '}
-									{t('common.elo')}
-								</option>
-							))}
-						</select>
+						<div ref={opponentRef} className="relative mt-1">
+							<input
+								type="text"
+								className="input input-bordered input-sm w-full bg-slate-800 text-white focus:input-primary pr-8"
+								placeholder={
+									selectedOpponent
+										? `${selectedOpponent.display_name} (@${selectedOpponent.username}) — ${selectedOpponent.elo_rating} ${t('common.elo')}`
+										: t('newMatch.opponentPlaceholder')
+								}
+								value={opponentSearch}
+								onChange={e => {
+									setOpponentSearch(e.target.value)
+									setOpponentId('')
+									setShowOpponentDropdown(true)
+								}}
+								onFocus={() => setShowOpponentDropdown(true)}
+							/>
+							{showOpponentDropdown && (
+								<ul className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+									{filteredProfiles.length === 0 ? (
+										<li className="px-3 py-2 text-xs text-slate-500">
+											{t('newMatch.noPlayersFound') ??
+												'Nessun giocatore trovato'}
+										</li>
+									) : (
+										filteredProfiles.map(p => (
+											<li
+												key={p.id}
+												className={`px-3 py-2 text-sm cursor-pointer flex items-center justify-between hover:bg-slate-700 ${opponentId === p.id ? 'text-primary' : 'text-white'}`}
+												onMouseDown={() => {
+													setOpponentId(p.id)
+													setOpponentSearch('')
+													setShowOpponentDropdown(false)
+												}}
+											>
+												<span>
+													{p.display_name}{' '}
+													<span className="text-slate-400 text-xs">
+														@{p.username}
+													</span>
+												</span>
+												<span className="text-xs text-slate-400 ml-2 shrink-0">
+													{p.elo_rating} {t('common.elo')}
+												</span>
+											</li>
+										))
+									)}
+								</ul>
+							)}
+						</div>
 					</div>
 
 					<div className="p-4 rounded-2xl bg-neutral border border-slate-800">
@@ -240,20 +294,27 @@ export const NewMatchScreen: React.FC = () => {
 							</span>
 						</label>
 						<div className="flex gap-2">
-							<button
-								type="button"
-								onClick={() => handleBestOfChange(3)}
-								className={`flex-1 btn btn-sm font-bold text-xs uppercase ${bestOf === 3 ? 'btn-primary text-white' : 'btn-outline border-slate-700'}`}
-							>
-								{t('newMatch.bestOf3Label')}
-							</button>
-							<button
-								type="button"
-								onClick={() => handleBestOfChange(5)}
-								className={`flex-1 btn btn-sm font-bold text-xs uppercase ${bestOf === 5 ? 'btn-primary text-white' : 'btn-outline border-slate-700'}`}
-							>
-								{t('newMatch.bestOf5Label')}
-							</button>
+							{([3, 5] as const).map(n => (
+								<button
+									key={n}
+									type="button"
+									onClick={() => handleBestOfChange(n)}
+									className={`flex-1 flex flex-col items-center gap-1 py-2.5 px-2 rounded-xl border-2 transition-all ${
+										bestOf === n
+											? 'border-primary bg-primary/10 text-primary'
+											: 'border-slate-700 bg-transparent text-slate-400 hover:border-slate-500'
+									}`}
+								>
+									<span className="font-bold text-xs uppercase tracking-wider">
+										{n === 3
+											? t('newMatch.bestOf3Label')
+											: t('newMatch.bestOf5Label')}
+									</span>
+									{bestOf === n && (
+										<Check className="w-3.5 h-3.5" strokeWidth={3} />
+									)}
+								</button>
+							))}
 						</div>
 						<p className="text-[10px] text-slate-500 mt-2 text-center">
 							{bestOf === 3
