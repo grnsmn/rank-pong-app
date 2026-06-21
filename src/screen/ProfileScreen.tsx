@@ -2,13 +2,49 @@ import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { dbService, type MatchWithSets } from '../services/db'
 import { useAppStore } from '../store/useAppStore'
-import { User, LogOut, Percent, Flame, Calendar, Trophy } from 'lucide-react'
+import {
+	User,
+	LogOut,
+	Percent,
+	Flame,
+	Calendar,
+	Trophy,
+	Pencil,
+	X,
+	Check,
+	ChevronDown,
+} from 'lucide-react'
 
+// ---------------------------------------------------------------------------
+// Tipi locali
+// ---------------------------------------------------------------------------
+type PlayerType = 'amateur' | 'competitive' | 'student'
+
+interface EditForm {
+	display_name: string
+	age: string
+	player_type: PlayerType
+}
+
+// ---------------------------------------------------------------------------
+// Componente principale
+// ---------------------------------------------------------------------------
 export const ProfileScreen: React.FC = () => {
 	const { t } = useTranslation()
-	const { currentProfile, logout } = useAppStore()
+	const { currentProfile, logout, updateProfile } = useAppStore()
 	const [matches, setMatches] = useState<MatchWithSets[]>([])
 	const [isLoading, setIsLoading] = useState(true)
+
+	// --- stato modifica profilo ---
+	const [isEditing, setIsEditing] = useState(false)
+	const [isSaving, setIsSaving] = useState(false)
+	const [formError, setFormError] = useState<string | null>(null)
+	const [successMsg, setSuccessMsg] = useState<string | null>(null)
+	const [form, setForm] = useState<EditForm>({
+		display_name: '',
+		age: '',
+		player_type: 'amateur',
+	})
 
 	const fetchStats = async () => {
 		setIsLoading(true)
@@ -26,6 +62,60 @@ export const ProfileScreen: React.FC = () => {
 		fetchStats()
 	}, [])
 
+	// Sincronizza il form ogni volta che si apre l'editor
+	const openEditor = () => {
+		if (!currentProfile) return
+		setForm({
+			display_name: currentProfile.display_name,
+			age: currentProfile.age != null ? String(currentProfile.age) : '',
+			player_type: currentProfile.player_type,
+		})
+		setFormError(null)
+		setSuccessMsg(null)
+		setIsEditing(true)
+	}
+
+	const closeEditor = () => {
+		setIsEditing(false)
+		setFormError(null)
+	}
+
+	const handleSave = async () => {
+		setFormError(null)
+
+		const trimmedName = form.display_name.trim()
+		if (!trimmedName) {
+			setFormError(t('profile.editErrorDisplayName'))
+			return
+		}
+
+		const ageNum = form.age.trim() === '' ? null : Number(form.age)
+		if (form.age.trim() !== '' && (isNaN(ageNum!) || ageNum! < 5 || ageNum! > 120)) {
+			setFormError(t('profile.editErrorAge'))
+			return
+		}
+
+		setIsSaving(true)
+		try {
+			await updateProfile({
+				display_name: trimmedName,
+				age: ageNum,
+				player_type: form.player_type,
+			})
+			setSuccessMsg(t('profile.editSuccess'))
+			setIsEditing(false)
+			// Mostra il toast di successo per 3 secondi
+			setTimeout(() => setSuccessMsg(null), 3000)
+		} catch {
+			setFormError(t('profile.editError'))
+		} finally {
+			setIsSaving(false)
+		}
+	}
+
+	// ---------------------------------------------------------------------------
+	// Helpers
+	// ---------------------------------------------------------------------------
 	const getPlayerTypeLabel = (type?: string) => {
 		switch (type) {
 			case 'competitive':
@@ -111,6 +201,9 @@ export const ProfileScreen: React.FC = () => {
 		)
 	}
 
+	// ---------------------------------------------------------------------------
+	// Render
+	// ---------------------------------------------------------------------------
 	return (
 		<div className="flex flex-col h-full bg-base-100 text-white">
 			<div className="px-4 pt-6 pb-2">
@@ -120,7 +213,16 @@ export const ProfileScreen: React.FC = () => {
 				<p className="text-xs text-slate-400">{t('profile.subtitle')}</p>
 			</div>
 
+			{/* Toast successo */}
+			{successMsg && (
+				<div className="mx-4 mb-2 px-4 py-2.5 rounded-xl bg-success/10 border border-success/30 flex items-center gap-2 text-success text-sm font-medium animate-fade-in">
+					<Check className="w-4 h-4 shrink-0" />
+					{successMsg}
+				</div>
+			)}
+
 			<div className="flex-1 overflow-y-auto px-4 pb-24 space-y-5">
+				{/* --- Card profilo --- */}
 				<div className="p-5 rounded-2xl bg-neutral border border-slate-800 flex flex-col items-center text-center shadow-lg">
 					<div className="relative mb-3">
 						<div className="w-20 h-20 rounded-full overflow-hidden bg-slate-800 border-2 border-primary flex items-center justify-center shadow-md">
@@ -143,7 +245,9 @@ export const ProfileScreen: React.FC = () => {
 						{currentProfile.display_name}
 					</h3>
 					<p className="text-xs text-slate-400">
-						@{currentProfile.username} • {currentProfile.age} {t('common.years')}
+						@{currentProfile.username}
+						{currentProfile.age != null &&
+							` • ${currentProfile.age} ${t('common.years')}`}
 					</p>
 
 					<div className="mt-4 px-6 py-2.5 bg-slate-950 rounded-2xl border border-slate-850 flex flex-col items-center">
@@ -157,8 +261,141 @@ export const ProfileScreen: React.FC = () => {
 							{t('profile.eloRank')}
 						</span>
 					</div>
+
+					{/* Bottone modifica */}
+					<button
+						id="profile-edit-btn"
+						onClick={openEditor}
+						className="mt-4 btn btn-sm btn-outline border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white hover:border-slate-600 gap-1.5 rounded-xl w-full"
+					>
+						<Pencil className="w-3.5 h-3.5" />
+						{t('profile.editButton')}
+					</button>
 				</div>
 
+				{/* --- Pannello modifica profilo --- */}
+				{isEditing && (
+					<div className="rounded-2xl bg-neutral border border-primary/30 shadow-lg overflow-hidden animate-fade-in">
+						{/* Header */}
+						<div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-slate-900/60">
+							<span className="text-sm font-bold text-white flex items-center gap-2">
+								<Pencil className="w-3.5 h-3.5 text-primary" />
+								{t('profile.editTitle')}
+							</span>
+							<button
+								onClick={closeEditor}
+								className="btn btn-ghost btn-xs btn-circle text-slate-400 hover:text-white"
+							>
+								<X className="w-4 h-4" />
+							</button>
+						</div>
+
+						{/* Campi form */}
+						<div className="px-5 py-4 space-y-4">
+							{/* Display name */}
+							<div className="flex flex-col gap-1.5">
+								<label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+									{t('profile.editDisplayName')}
+								</label>
+								<input
+									id="profile-edit-display-name"
+									type="text"
+									value={form.display_name}
+									onChange={e =>
+										setForm(prev => ({ ...prev, display_name: e.target.value }))
+									}
+									placeholder={t('profile.editDisplayNamePlaceholder')}
+									className="input input-sm bg-slate-900 border-slate-700 text-white placeholder-slate-600 focus:border-primary focus:outline-none rounded-xl w-full"
+								/>
+							</div>
+
+							{/* Età */}
+							<div className="flex flex-col gap-1.5">
+								<label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+									{t('profile.editAge')}
+								</label>
+								<input
+									id="profile-edit-age"
+									type="number"
+									min={5}
+									max={120}
+									value={form.age}
+									onChange={e =>
+										setForm(prev => ({ ...prev, age: e.target.value }))
+									}
+									placeholder={t('profile.editAgePlaceholder')}
+									className="input input-sm bg-slate-900 border-slate-700 text-white placeholder-slate-600 focus:border-primary focus:outline-none rounded-xl w-full"
+								/>
+							</div>
+
+							{/* Tipo giocatore */}
+							<div className="flex flex-col gap-1.5">
+								<label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+									{t('profile.editPlayerType')}
+								</label>
+								<div className="relative">
+									<select
+										id="profile-edit-player-type"
+										value={form.player_type}
+										onChange={e =>
+											setForm(prev => ({
+												...prev,
+												player_type: e.target.value as PlayerType,
+											}))
+										}
+										className="select select-sm bg-slate-900 border-slate-700 text-white focus:border-primary focus:outline-none rounded-xl w-full appearance-none pr-8"
+									>
+										<option value="amateur">{t('playerType.amateur')}</option>
+										<option value="competitive">
+											{t('playerType.competitive')}
+										</option>
+										<option value="student">{t('playerType.student')}</option>
+									</select>
+									<ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 pointer-events-none" />
+								</div>
+							</div>
+
+							{/* Messaggio di errore */}
+							{formError && (
+								<p className="text-xs text-error font-medium flex items-center gap-1.5">
+									<X className="w-3.5 h-3.5 shrink-0" />
+									{formError}
+								</p>
+							)}
+
+							{/* Azioni */}
+							<div className="flex gap-2 pt-1">
+								<button
+									onClick={closeEditor}
+									disabled={isSaving}
+									className="btn btn-sm btn-ghost flex-1 rounded-xl text-slate-400 hover:text-white border border-slate-700"
+								>
+									{t('profile.editCancel')}
+								</button>
+								<button
+									id="profile-edit-save-btn"
+									onClick={handleSave}
+									disabled={isSaving}
+									className="btn btn-sm btn-primary flex-1 rounded-xl font-bold gap-1.5"
+								>
+									{isSaving ? (
+										<>
+											<span className="loading loading-spinner loading-xs" />
+											{t('profile.editSaving')}
+										</>
+									) : (
+										<>
+											<Check className="w-3.5 h-3.5" />
+											{t('profile.editSave')}
+										</>
+									)}
+								</button>
+							</div>
+						</div>
+					</div>
+				)}
+
+				{/* --- Statistiche --- */}
 				{isLoading ? (
 					<div className="flex justify-center p-4">
 						<span className="loading loading-spinner loading-sm text-primary"></span>
@@ -237,6 +474,7 @@ export const ProfileScreen: React.FC = () => {
 					</div>
 				) : null}
 
+				{/* --- Logout --- */}
 				<div className="pt-2">
 					<button
 						onClick={() => {

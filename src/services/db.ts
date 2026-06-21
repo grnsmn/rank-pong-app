@@ -553,4 +553,36 @@ export const dbService = {
 			return matches[matchIndex]
 		}
 	},
+
+	async updateProfile(
+		id: string,
+		updates: {
+			display_name?: string
+			age?: number | null
+			player_type?: 'amateur' | 'competitive' | 'student'
+		}
+	): Promise<Profile> {
+		if (isSupabaseConfigured && supabase) {
+			const { data, error } = await supabase
+				.from('profiles')
+				.update(updates)
+				.eq('id', id)
+				.select('*')
+				.single()
+
+			if (error) throw error
+
+			localStorage.setItem('rp_session', JSON.stringify(data))
+			return data as Profile
+		} else {
+			const profiles = JSON.parse(localStorage.getItem('rp_profiles') || '[]') as Profile[]
+			const index = profiles.findIndex(p => p.id === id)
+			if (index === -1) throw new Error('Profilo non trovato')
+
+			profiles[index] = { ...profiles[index], ...updates }
+			localStorage.setItem('rp_profiles', JSON.stringify(profiles))
+			localStorage.setItem('rp_session', JSON.stringify(profiles[index]))
+			return profiles[index]
+		}
+	},
 }

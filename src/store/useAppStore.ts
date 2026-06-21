@@ -18,6 +18,11 @@ interface AppState {
 	) => Promise<void>
 	logout: () => Promise<void>
 	refreshProfile: () => Promise<void>
+	updateProfile: (updates: {
+		display_name?: string
+		age?: number | null
+		player_type?: 'amateur' | 'competitive' | 'student'
+	}) => Promise<void>
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -114,5 +119,18 @@ export const useAppStore = create<AppState>((set, get) => ({
 		} catch (err) {
 			console.error('Errore aggiornamento profilo:', err)
 		}
+	},
+
+	updateProfile: async updates => {
+		const { currentUser } = get()
+		if (!currentUser) return
+		const updated = await dbService.updateProfile(currentUser.id, updates)
+		set({
+			currentProfile: updated,
+			currentUser: {
+				...currentUser,
+				display_name: updated.display_name,
+			},
+		})
 	},
 }))
