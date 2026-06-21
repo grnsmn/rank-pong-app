@@ -226,7 +226,7 @@ export const LoginScreen: React.FC = () => {
 						setLocalError(null)
 						setSuccessMsg(null)
 					}}
-					className="btn btn-outline btn-sm w-full text-xs hover:btn-primary"
+					className={`btn btn-sm w-full font-semibold ${isSignup ? 'btn-ghost text-slate-300 hover:text-white' : 'btn-secondary text-white'}`}
 				>
 					{isSignup ? t('login.hasAccount') : t('login.noAccount')}
 				</button>
