@@ -249,11 +249,32 @@ export const dbService = {
 		}
 	},
 
-	async login(email: string, password: string): Promise<Profile> {
+	async login(emailOrUsername: string, password: string): Promise<Profile> {
+		const isEmail = emailOrUsername.includes('@')
+
 		if (isSupabaseConfigured && supabase) {
-			const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+			let resolvedEmail = emailOrUsername
+
+			// Se è uno username, recupera l'email tramite RPC
+			if (!isEmail) {
+				const { data: emailData, error: rpcError } = await supabase.rpc(
+					'get_email_by_username',
+					{ p_username: emailOrUsername.toLowerCase() }
+				)
+
+				if (rpcError || !emailData) {
+					throw new Error('Utente non trovato')
+				}
+
+				resolvedEmail = emailData as string
+			}
+
+			const { data, error } = await supabase.auth.signInWithPassword({
+				email: resolvedEmail,
+				password,
+			})
 			if (error || !data.user) {
-				throw new Error(error?.message || 'Login fallito')
+				throw new Error(error?.message || 'Credenziali non valide')
 			}
 
 			const { data: profile, error: profError } = await supabase
@@ -269,14 +290,16 @@ export const dbService = {
 			localStorage.setItem('rp_session', JSON.stringify(profile))
 			return profile as Profile
 		} else {
-			// Mock login: usiamo email come username
-			const username = email.split('@')[0]
+			// Mock login: supporta sia email che username
 			const profiles = JSON.parse(localStorage.getItem('rp_profiles') || '[]') as Profile[]
-			const profile = profiles.find(p => p.username === username)
+
+			const profile = isEmail
+				? profiles.find(p => `${p.username}@rankpong.local` === emailOrUsername)
+				: profiles.find(p => p.username === emailOrUsername.toLowerCase())
 
 			if (!profile) {
 				throw new Error(
-					"Utente non trovato (inserisci l'email con l'username dei giocatori di prova, es: marco_topspin@rankpong.local)"
+					'Utente non trovato. In modalità demo usa username (es. marco_topspin) o email (es. marco_topspin@rankpong.local)'
 				)
 			}
 

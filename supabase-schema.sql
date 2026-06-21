@@ -201,3 +201,33 @@ $$;
 create trigger on_match_confirmed
   before update on public.matches
   for each row execute procedure public.calculate_elo_on_confirm();
+
+
+-- ============================================================
+-- 5. RPC: recupera email da username (per login con username)
+-- ============================================================
+
+-- Funzione SECURITY DEFINER: accede ad auth.users ma espone solo l'email
+-- corrispondente allo username fornito. Utile per il login con username.
+create or replace function public.get_email_by_username(p_username text)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_email text;
+begin
+  select au.email
+    into v_email
+    from public.profiles pr
+    join auth.users au on au.id = pr.id
+   where pr.username = lower(p_username)
+   limit 1;
+
+  return v_email;
+end;
+$$;
+
+-- Consenti l'esecuzione anche agli utenti anonimi (necessario per il login)
+grant execute on function public.get_email_by_username(text) to anon, authenticated;

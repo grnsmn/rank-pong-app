@@ -110,12 +110,12 @@ export const LoginScreen: React.FC = () => {
 							</span>
 						</label>
 						<input
-							type="email"
+							type="text"
 							placeholder={t('login.emailPlaceholder')}
 							className="input input-bordered input-sm w-full bg-slate-800 text-white focus:input-primary"
 							value={email}
 							onChange={e => setEmail(e.target.value)}
-							required
+							autoComplete="username"
 						/>
 					</div>
 
