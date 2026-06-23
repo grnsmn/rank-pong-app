@@ -106,6 +106,9 @@ const it = {
 		correctionValidEqual: 'i punteggi non possono essere uguali',
 		correctionValidMin11: 'il punteggio vincente deve essere almeno 11',
 		correctionValidMargin: 'il vincitore deve avere almeno 2 punti di vantaggio',
+		pendingAsPlayer1: 'ha registrato una partita per te contro',
+		arbitratorBadge: 'ARBITRATO',
+		awaitingYourConfirm: 'Richiede la tua conferma',
 	},
 	newMatch: {
 		title: 'Registra Partita',
@@ -139,8 +142,19 @@ const it = {
 		errorInvalidScore: 'Il punteggio inserito non è valido o il match non è concluso.',
 		successSubmit:
 			'Match registrato con successo! Attendi la conferma del tuo avversario per aggiornare il ranking.',
+		arbitratorSuccess:
+			'Partita registrata come arbitro. Entrambi i giocatori devono confermare il risultato.',
 		errorSave: 'Errore durante il salvataggio del match.',
 		submitButton: 'Invia per la Conferma',
+		arbitratorToggle: 'Registra come arbitro',
+		arbitratorToggleDesc: 'Per conto di due giocatori diversi da te',
+		stepPlayer1: '1. SELEZIONA GIOCATORE 1',
+		stepPlayer2: '2. SELEZIONA GIOCATORE 2',
+		player1Placeholder: 'Cerca giocatore 1...',
+		player2Placeholder: 'Cerca giocatore 2...',
+		errorNoPlayer1: 'Seleziona il Giocatore 1',
+		errorSamePlayers: 'I due giocatori devono essere diversi',
+		vsLabel: 'vs',
 	},
 	profile: {
 		title: 'Il Mio Profilo',

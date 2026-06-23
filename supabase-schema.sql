@@ -365,3 +365,74 @@ begin
       and (player_1_id = (select auth.uid()) or player_2_id = (select auth.uid()));
 end;
 $$;
+
+-- ============================================================
+-- 6. MODALITÀ ARBITRO
+-- ============================================================
+
+-- Nuove colonne per tracciare la doppia conferma
+alter table public.matches
+  add column if not exists player_1_confirmed boolean not null default false,
+  add column if not exists player_2_confirmed boolean not null default false;
+
+-- Backfill: i match esistenti creati normalmente (player_1_id = created_by) hanno già confermato come p1
+update public.matches
+  set player_1_confirmed = true
+  where player_1_id = created_by;
+
+-- Policy INSERT matches: permette all'arbitro di creare match dove non è player
+drop policy if exists "Authenticated users can create matches" on public.matches;
+
+create policy "Authenticated users can create matches"
+  on public.matches for insert
+  to authenticated
+  with check (
+    (select auth.uid()) = created_by
+  );
+
+-- Policy INSERT sets: allineata a created_by invece di player_1_id
+drop policy if exists "Match creator can insert sets" on public.sets;
+
+create policy "Match creator can insert sets"
+  on public.sets for insert
+  to authenticated
+  with check (
+    exists (
+      select 1 from public.matches
+      where id = match_id
+        and created_by = (select auth.uid())
+    )
+  );
+
+-- RPC: conferma match come giocatore (gestisce doppia conferma)
+create or replace function public.confirm_match_player(match_id_param uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  m record;
+begin
+  select * into m from public.matches where id = match_id_param;
+
+  if m.status != 'pending' then
+    raise exception 'Il match non è in stato pending';
+  end if;
+
+  if (select auth.uid()) = m.player_1_id then
+    update public.matches set player_1_confirmed = true where id = match_id_param;
+  elsif (select auth.uid()) = m.player_2_id then
+    update public.matches set player_2_confirmed = true where id = match_id_param;
+  else
+    raise exception 'Non sei un giocatore di questo match';
+  end if;
+
+  -- Rileggo dopo l'update
+  select * into m from public.matches where id = match_id_param;
+
+  if m.player_1_confirmed and m.player_2_confirmed then
+    update public.matches set status = 'confirmed' where id = match_id_param;
+  end if;
+end;
+$$;

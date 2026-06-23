@@ -20,6 +20,8 @@ export interface Match {
 	status: 'pending' | 'confirmed' | 'disputed'
 	elo_change_p1: number | null
 	elo_change_p2: number | null
+	player_1_confirmed: boolean
+	player_2_confirmed: boolean
 	correction_requested_by: string | null
 	correction_sets: { set_number: number; score_p1: number; score_p2: number }[] | null
 	correction_status: 'pending' | 'approved' | 'rejected' | null
@@ -101,6 +103,8 @@ const INITIAL_MOCK_MATCHES: MatchWithSets[] = [
 		status: 'confirmed',
 		elo_change_p1: 15,
 		elo_change_p2: -15,
+		player_1_confirmed: true,
+		player_2_confirmed: true,
 		correction_requested_by: null,
 		correction_sets: null,
 		correction_status: null,
@@ -385,6 +389,8 @@ export const dbService = {
 		const currentUser = await this.getCurrentUser()
 		if (!currentUser) throw new Error('Devi essere autenticato per registrare un match')
 
+		const isArbitrated = player1Id !== currentUser.id
+
 		if (isSupabaseConfigured && supabase) {
 			// Inserisce il match
 			const { data: match, error: matchError } = await supabase
@@ -394,7 +400,9 @@ export const dbService = {
 					player_1_id: player1Id,
 					player_2_id: player2Id,
 					best_of: bestOf,
-					status: 'pending', // Doppia conferma attiva, parte pending
+					status: 'pending',
+					player_1_confirmed: !isArbitrated,
+					player_2_confirmed: false,
 				})
 				.select()
 				.single()
@@ -435,6 +443,8 @@ export const dbService = {
 				status: 'pending',
 				elo_change_p1: null,
 				elo_change_p2: null,
+				player_1_confirmed: !isArbitrated,
+				player_2_confirmed: false,
 				created_at: new Date().toISOString(),
 				correction_requested_by: null,
 				correction_sets: null,
@@ -527,6 +537,67 @@ export const dbService = {
 			localStorage.setItem('rp_matches', JSON.stringify(matches))
 
 			return match
+		}
+	},
+
+	async confirmMatchAsPlayer(matchId: string): Promise<void> {
+		const currentUser = await this.getCurrentUser()
+		if (!currentUser) throw new Error('Devi essere autenticato')
+
+		if (isSupabaseConfigured && supabase) {
+			const { error } = await supabase.rpc('confirm_match_player', {
+				match_id_param: matchId,
+			})
+			if (error) throw error
+		} else {
+			const matches = JSON.parse(
+				localStorage.getItem('rp_matches') || '[]'
+			) as MatchWithSets[]
+			const profiles = JSON.parse(localStorage.getItem('rp_profiles') || '[]') as Profile[]
+
+			const idx = matches.findIndex(m => m.id === matchId)
+			if (idx === -1) throw new Error('Match non trovato')
+
+			const match = matches[idx]
+			if (match.status !== 'pending') throw new Error('Il match non è in stato pending')
+
+			if (currentUser.id === match.player_1_id) {
+				matches[idx].player_1_confirmed = true
+			} else if (currentUser.id === match.player_2_id) {
+				matches[idx].player_2_confirmed = true
+			} else {
+				throw new Error('Non sei un giocatore di questo match')
+			}
+
+			if (matches[idx].player_1_confirmed && matches[idx].player_2_confirmed) {
+				let setsWonP1 = 0
+				let setsWonP2 = 0
+				match.sets.forEach(s => {
+					if (s.score_p1 > s.score_p2) setsWonP1++
+					else setsWonP2++
+				})
+
+				const profile1 = profiles.find(p => p.id === match.player_1_id)
+				const profile2 = profiles.find(p => p.id === match.player_2_id)
+				if (!profile1 || !profile2) throw new Error('Giocatori non trovati')
+
+				const { changeA, changeB } = calculateEloTS(
+					profile1.elo_rating,
+					profile2.elo_rating,
+					setsWonP1,
+					setsWonP2
+				)
+
+				profile1.elo_rating = Math.max(0, profile1.elo_rating + changeA)
+				profile2.elo_rating = Math.max(0, profile2.elo_rating + changeB)
+				matches[idx].status = 'confirmed'
+				matches[idx].elo_change_p1 = changeA
+				matches[idx].elo_change_p2 = changeB
+
+				localStorage.setItem('rp_profiles', JSON.stringify(profiles))
+			}
+
+			localStorage.setItem('rp_matches', JSON.stringify(matches))
 		}
 	},
 

@@ -34,7 +34,10 @@ export const App: React.FC = () => {
 		try {
 			const matches = await dbService.getMatches()
 			const pendingMatches = matches.filter(
-				m => m.status === 'pending' && m.player_2_id === currentUser.id
+				m =>
+					m.status === 'pending' &&
+					((m.player_2_id === currentUser.id && !m.player_2_confirmed) ||
+						(m.player_1_id === currentUser.id && !m.player_1_confirmed))
 			).length
 			const pendingCorrections = matches.filter(
 				m =>

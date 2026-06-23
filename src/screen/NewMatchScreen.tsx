@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { dbService, type Profile } from '../services/db'
 import { useAppStore } from '../store/useAppStore'
-import { AlertTriangle, CheckCircle2, Check } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Check, Scale } from 'lucide-react'
 
 interface SetInput {
 	score1: string
@@ -13,6 +13,11 @@ export const NewMatchScreen: React.FC = () => {
 	const { t } = useTranslation()
 	const { currentUser } = useAppStore()
 	const [profiles, setProfiles] = useState<Profile[]>([])
+	const [isArbitratorMode, setIsArbitratorMode] = useState(false)
+	const [player1Id, setPlayer1Id] = useState('')
+	const [player1Search, setPlayer1Search] = useState('')
+	const [showPlayer1Dropdown, setShowPlayer1Dropdown] = useState(false)
+	const player1Ref = useRef<HTMLDivElement>(null)
 	const [opponentId, setOpponentId] = useState('')
 	const [opponentSearch, setOpponentSearch] = useState('')
 	const [showOpponentDropdown, setShowOpponentDropdown] = useState(false)
@@ -124,6 +129,10 @@ export const NewMatchScreen: React.FC = () => {
 			}
 		})
 
+		const playersValid = isArbitratorMode
+			? player1Id !== '' && opponentId !== '' && player1Id !== opponentId
+			: opponentId !== ''
+
 		return {
 			setsWonP1,
 			setsWonP2,
@@ -132,8 +141,7 @@ export const NewMatchScreen: React.FC = () => {
 			tooManySets,
 			excessSets,
 			errors,
-			canSubmit:
-				allSetsValid && matchFinished && !tooManySets && !excessSets && opponentId !== '',
+			canSubmit: allSetsValid && matchFinished && !tooManySets && !excessSets && playersValid,
 		}
 	}
 
@@ -166,12 +174,35 @@ export const NewMatchScreen: React.FC = () => {
 		setErrorMsg(null)
 	}
 
+	const handleArbitratorToggle = () => {
+		setIsArbitratorMode(prev => !prev)
+		setPlayer1Id('')
+		setPlayer1Search('')
+		setOpponentId('')
+		setOpponentSearch('')
+		setSets([{ score1: '', score2: '' }])
+		setErrorMsg(null)
+	}
+
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
 		setErrorMsg(null)
 		setSuccessMsg(null)
 
-		if (!opponentId) {
+		if (isArbitratorMode) {
+			if (!player1Id) {
+				setErrorMsg(t('newMatch.errorNoPlayer1'))
+				return
+			}
+			if (!opponentId) {
+				setErrorMsg(t('newMatch.errorNoOpponent'))
+				return
+			}
+			if (player1Id === opponentId) {
+				setErrorMsg(t('newMatch.errorSamePlayers'))
+				return
+			}
+		} else if (!opponentId) {
 			setErrorMsg(t('newMatch.errorNoOpponent'))
 			return
 		}
@@ -189,9 +220,14 @@ export const NewMatchScreen: React.FC = () => {
 				score_p2: parseInt(set.score2),
 			}))
 
-			await dbService.createMatch(currentUser?.id || '', opponentId, bestOf, formattedScores)
+			const finalPlayer1Id = isArbitratorMode ? player1Id : currentUser?.id || ''
+			await dbService.createMatch(finalPlayer1Id, opponentId, bestOf, formattedScores)
 
-			setSuccessMsg(t('newMatch.successSubmit'))
+			setSuccessMsg(
+				isArbitratorMode ? t('newMatch.arbitratorSuccess') : t('newMatch.successSubmit')
+			)
+			setPlayer1Id('')
+			setPlayer1Search('')
 			setOpponentId('')
 			setSets([{ score1: '', score2: '' }])
 		} catch (err: any) {
@@ -202,9 +238,17 @@ export const NewMatchScreen: React.FC = () => {
 	}
 
 	const selectedOpponent = profiles.find(p => p.id === opponentId)
+	const selectedPlayer1 = profiles.find(p => p.id === player1Id)
 
-	const filteredProfiles = profiles.filter(p => {
+	const filteredOpponentProfiles = profiles.filter(p => {
+		if (isArbitratorMode && p.id === player1Id) return false
 		const q = opponentSearch.toLowerCase()
+		return p.display_name.toLowerCase().includes(q) || p.username.toLowerCase().includes(q)
+	})
+
+	const filteredPlayer1Profiles = profiles.filter(p => {
+		if (p.id === opponentId) return false
+		const q = player1Search.toLowerCase()
 		return p.display_name.toLowerCase().includes(q) || p.username.toLowerCase().includes(q)
 	})
 
@@ -212,6 +256,9 @@ export const NewMatchScreen: React.FC = () => {
 		const handleClickOutside = (e: MouseEvent) => {
 			if (opponentRef.current && !opponentRef.current.contains(e.target as Node)) {
 				setShowOpponentDropdown(false)
+			}
+			if (player1Ref.current && !player1Ref.current.contains(e.target as Node)) {
+				setShowPlayer1Dropdown(false)
 			}
 		}
 		document.addEventListener('mousedown', handleClickOutside)
@@ -229,10 +276,101 @@ export const NewMatchScreen: React.FC = () => {
 
 			<div className="flex-1 overflow-y-auto px-4 pb-24">
 				<form onSubmit={handleSubmit} className="space-y-5 pt-3">
+					{/* Toggle modalità arbitro */}
+					<button
+						type="button"
+						onClick={handleArbitratorToggle}
+						className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${
+							isArbitratorMode
+								? 'border-purple-500/50 bg-purple-950/30 text-purple-300'
+								: 'border-slate-700 bg-transparent text-slate-400 hover:border-slate-600'
+						}`}
+					>
+						<Scale className="w-4 h-4 shrink-0" />
+						<div className="flex-1 text-left">
+							<span className="text-xs font-bold block">
+								{t('newMatch.arbitratorToggle')}
+							</span>
+							<span className="text-[10px] opacity-70">
+								{t('newMatch.arbitratorToggleDesc')}
+							</span>
+						</div>
+						<div
+							className={`w-9 h-5 rounded-full transition-colors relative shrink-0 ${isArbitratorMode ? 'bg-purple-500' : 'bg-slate-700'}`}
+						>
+							<div
+								className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${isArbitratorMode ? 'translate-x-4' : 'translate-x-0.5'}`}
+							/>
+						</div>
+					</button>
+
+					{/* Picker Giocatore 1 (solo in modalità arbitro) */}
+					{isArbitratorMode && (
+						<div className="form-control w-full p-4 rounded-2xl bg-neutral border border-slate-800">
+							<label className="label py-1">
+								<span className="label-text text-xs text-slate-300 font-bold">
+									{t('newMatch.stepPlayer1')}
+								</span>
+							</label>
+							<div ref={player1Ref} className="relative mt-1">
+								<input
+									type="text"
+									className="input input-bordered input-sm w-full bg-slate-800 text-white focus:input-primary pr-8"
+									placeholder={
+										selectedPlayer1
+											? `${selectedPlayer1.display_name} (@${selectedPlayer1.username}) — ${selectedPlayer1.elo_rating} ${t('common.elo')}`
+											: t('newMatch.player1Placeholder')
+									}
+									value={player1Search}
+									onChange={e => {
+										setPlayer1Search(e.target.value)
+										setPlayer1Id('')
+										setShowPlayer1Dropdown(true)
+									}}
+									onFocus={() => setShowPlayer1Dropdown(true)}
+								/>
+								{showPlayer1Dropdown && (
+									<ul className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+										{filteredPlayer1Profiles.length === 0 ? (
+											<li className="px-3 py-2 text-xs text-slate-500">
+												{t('newMatch.noPlayersFound')}
+											</li>
+										) : (
+											filteredPlayer1Profiles.map(p => (
+												<li
+													key={p.id}
+													className={`px-3 py-2 text-sm cursor-pointer flex items-center justify-between hover:bg-slate-700 ${player1Id === p.id ? 'text-primary' : 'text-white'}`}
+													onMouseDown={() => {
+														setPlayer1Id(p.id)
+														setPlayer1Search('')
+														setShowPlayer1Dropdown(false)
+													}}
+												>
+													<span>
+														{p.display_name}{' '}
+														<span className="text-slate-400 text-xs">
+															@{p.username}
+														</span>
+													</span>
+													<span className="text-xs text-slate-400 ml-2 shrink-0">
+														{p.elo_rating} {t('common.elo')}
+													</span>
+												</li>
+											))
+										)}
+									</ul>
+								)}
+							</div>
+						</div>
+					)}
+
+					{/* Picker avversario (Giocatore 2 in modalità arbitro) */}
 					<div className="form-control w-full p-4 rounded-2xl bg-neutral border border-slate-800">
 						<label className="label py-1">
 							<span className="label-text text-xs text-slate-300 font-bold">
-								{t('newMatch.stepOpponent')}
+								{isArbitratorMode
+									? t('newMatch.stepPlayer2')
+									: t('newMatch.stepOpponent')}
 							</span>
 						</label>
 						<div ref={opponentRef} className="relative mt-1">
@@ -242,7 +380,9 @@ export const NewMatchScreen: React.FC = () => {
 								placeholder={
 									selectedOpponent
 										? `${selectedOpponent.display_name} (@${selectedOpponent.username}) — ${selectedOpponent.elo_rating} ${t('common.elo')}`
-										: t('newMatch.opponentPlaceholder')
+										: isArbitratorMode
+											? t('newMatch.player2Placeholder')
+											: t('newMatch.opponentPlaceholder')
 								}
 								value={opponentSearch}
 								onChange={e => {
@@ -254,13 +394,12 @@ export const NewMatchScreen: React.FC = () => {
 							/>
 							{showOpponentDropdown && (
 								<ul className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-xl max-h-48 overflow-y-auto">
-									{filteredProfiles.length === 0 ? (
+									{filteredOpponentProfiles.length === 0 ? (
 										<li className="px-3 py-2 text-xs text-slate-500">
-											{t('newMatch.noPlayersFound') ??
-												'Nessun giocatore trovato'}
+											{t('newMatch.noPlayersFound')}
 										</li>
 									) : (
-										filteredProfiles.map(p => (
+										filteredOpponentProfiles.map(p => (
 											<li
 												key={p.id}
 												className={`px-3 py-2 text-sm cursor-pointer flex items-center justify-between hover:bg-slate-700 ${opponentId === p.id ? 'text-primary' : 'text-white'}`}
@@ -323,15 +462,18 @@ export const NewMatchScreen: React.FC = () => {
 						</p>
 					</div>
 
-					{opponentId && (
+					{(isArbitratorMode
+						? player1Id !== '' && opponentId !== ''
+						: opponentId !== '') && (
 						<div className="p-4 rounded-2xl bg-neutral border border-slate-800 space-y-4">
 							<div className="flex justify-between items-center pb-2 border-b border-slate-800">
 								<span className="text-xs font-bold text-slate-300">
 									{t('newMatch.stepScores')}
 								</span>
 								<span className="text-[10px] text-slate-500 font-semibold uppercase">
-									{t('newMatch.youVs')}{' '}
-									{selectedOpponent?.display_name.split(' ')[0]}
+									{isArbitratorMode
+										? `${selectedPlayer1?.display_name.split(' ')[0]} ${t('newMatch.vsLabel')} ${selectedOpponent?.display_name.split(' ')[0]}`
+										: `${t('newMatch.youVs')} ${selectedOpponent?.display_name.split(' ')[0]}`}
 								</span>
 							</div>
 
@@ -353,7 +495,13 @@ export const NewMatchScreen: React.FC = () => {
 											<input
 												type="text"
 												pattern="\d*"
-												placeholder={t('common.you')}
+												placeholder={
+													isArbitratorMode
+														? (selectedPlayer1?.display_name.split(
+																' '
+															)[0] ?? 'P1')
+														: t('common.you')
+												}
 												className="input input-bordered input-sm w-full bg-slate-800 text-center font-bold text-white text-sm focus:input-primary"
 												value={set.score1}
 												onChange={e =>
@@ -369,7 +517,13 @@ export const NewMatchScreen: React.FC = () => {
 											<input
 												type="text"
 												pattern="\d*"
-												placeholder={t('common.opponent')}
+												placeholder={
+													isArbitratorMode
+														? (selectedOpponent?.display_name.split(
+																' '
+															)[0] ?? 'P2')
+														: t('common.opponent')
+												}
 												className="input input-bordered input-sm w-full bg-slate-800 text-center font-bold text-white text-sm focus:input-primary"
 												value={set.score2}
 												onChange={e =>
@@ -424,21 +578,31 @@ export const NewMatchScreen: React.FC = () => {
 						</div>
 					)}
 
-					{status.errors.length > 0 && opponentId !== '' && (
-						<div className="p-3 bg-warning/10 border border-warning/20 text-warning rounded-xl text-xs space-y-1">
-							<div className="flex items-center gap-1.5 font-bold mb-1">
-								<AlertTriangle className="w-4 h-4" /> {t('newMatch.scoreErrors')}
+					{status.errors.length > 0 &&
+						(isArbitratorMode
+							? player1Id !== '' && opponentId !== ''
+							: opponentId !== '') && (
+							<div className="p-3 bg-warning/10 border border-warning/20 text-warning rounded-xl text-xs space-y-1">
+								<div className="flex items-center gap-1.5 font-bold mb-1">
+									<AlertTriangle className="w-4 h-4" />{' '}
+									{t('newMatch.scoreErrors')}
+								</div>
+								{status.errors.map((err, i) => (
+									<div key={i}>• {err}</div>
+								))}
 							</div>
-							{status.errors.map((err, i) => (
-								<div key={i}>• {err}</div>
-							))}
-						</div>
-					)}
+						)}
 
-					{opponentId !== '' && (
+					{(isArbitratorMode
+						? player1Id !== '' && opponentId !== ''
+						: opponentId !== '') && (
 						<div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
 							<div className="flex justify-between items-center text-xs">
-								<span>{t('newMatch.yourSets')}</span>
+								<span>
+									{isArbitratorMode
+										? `${t('newMatch.opponentSets')} ${selectedPlayer1?.display_name.split(' ')[0]}:`
+										: t('newMatch.yourSets')}
+								</span>
 								<span className="font-extrabold text-success">
 									{status.setsWonP1}
 								</span>

@@ -39,7 +39,7 @@ export const MatchesScreen: React.FC = () => {
 
 	const handleConfirm = async (matchId: string) => {
 		try {
-			await dbService.confirmMatch(matchId)
+			await dbService.confirmMatchAsPlayer(matchId)
 			await fetchMatches()
 			await refreshProfile()
 		} catch (err) {
@@ -132,10 +132,19 @@ export const MatchesScreen: React.FC = () => {
 	}
 
 	const pendingRequests = matches.filter(
-		m => m.status === 'pending' && m.player_2_id === currentUser?.id
+		m =>
+			m.status === 'pending' &&
+			((m.player_1_id === currentUser?.id && !m.player_1_confirmed) ||
+				(m.player_2_id === currentUser?.id && !m.player_2_confirmed))
 	)
+	const pendingRequestIds = new Set(pendingRequests.map(m => m.id))
 	const pendingSent = matches.filter(
-		m => m.status === 'pending' && m.player_1_id === currentUser?.id
+		m =>
+			m.status === 'pending' &&
+			!pendingRequestIds.has(m.id) &&
+			(m.created_by === currentUser?.id ||
+				m.player_1_id === currentUser?.id ||
+				m.player_2_id === currentUser?.id)
 	)
 	const confirmedMatches = matches.filter(m => m.status === 'confirmed')
 	const disputedMatches = matches.filter(m => m.status === 'disputed')
@@ -303,15 +312,24 @@ export const MatchesScreen: React.FC = () => {
 							<div className="space-y-3">
 								{pendingRequests.map(match => {
 									const { p1, p2 } = getSetsScore(match.sets)
+									const iAmPlayer1 = match.player_1_id === currentUser?.id
+									const isArbitrated = match.created_by !== match.player_1_id
 									return (
 										<div
 											key={match.id}
 											className="p-4 rounded-2xl bg-slate-900 border border-primary/20 shadow-md"
 										>
 											<div className="flex justify-between items-start mb-2">
-												<span className="badge badge-primary badge-sm font-extrabold text-[10px] text-white">
-													{t('matches.confirmRequest')}
-												</span>
+												<div className="flex gap-1.5">
+													<span className="badge badge-primary badge-sm font-extrabold text-[10px] text-white">
+														{t('matches.confirmRequest')}
+													</span>
+													{isArbitrated && (
+														<span className="badge badge-sm font-extrabold text-[10px] bg-purple-600 text-white border-none">
+															{t('matches.arbitratorBadge')}
+														</span>
+													)}
+												</div>
 												<span className="text-[10px] text-slate-500 flex items-center gap-1">
 													<Calendar className="w-3 h-3" />
 													{new Date(
@@ -321,10 +339,24 @@ export const MatchesScreen: React.FC = () => {
 											</div>
 
 											<p className="text-sm mb-3">
-												<span className="font-extrabold text-slate-200">
-													{match.player1?.display_name}
-												</span>{' '}
-												{t('matches.challenged')} {match.best_of}):
+												{iAmPlayer1 ? (
+													<>
+														<span className="font-extrabold text-slate-200">
+															{match.player2?.display_name}
+														</span>{' '}
+														{t('matches.pendingAsPlayer1')}{' '}
+														<span className="font-extrabold text-slate-200">
+															{match.player1?.display_name}
+														</span>
+													</>
+												) : (
+													<>
+														<span className="font-extrabold text-slate-200">
+															{match.player1?.display_name}
+														</span>{' '}
+														{t('matches.challenged')} {match.best_of}):
+													</>
+												)}
 											</p>
 
 											<div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 mb-4">
