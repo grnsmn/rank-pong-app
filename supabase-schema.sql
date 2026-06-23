@@ -201,3 +201,167 @@ $$;
 create trigger on_match_confirmed
   before update on public.matches
   for each row execute procedure public.calculate_elo_on_confirm();
+
+
+-- ============================================================
+-- 5. CORREZIONI MATCH
+-- ============================================================
+
+-- Aggiunge colonne per gestire le richieste di correzione
+alter table public.matches
+  add column if not exists correction_requested_by uuid references public.profiles(id),
+  add column if not exists correction_sets         jsonb,
+  add column if not exists correction_status       text
+    check (correction_status in ('pending', 'approved', 'rejected'));
+
+-- Policy per aggiornare i set (usata dal trigger di correzione, security definer bypassa RLS)
+create policy "Players can update sets of their matches"
+  on public.sets for update
+  to authenticated
+  using (
+    exists (
+      select 1 from public.matches
+      where id = match_id
+        and (
+          (select auth.uid()) = player_1_id
+          or (select auth.uid()) = player_2_id
+        )
+    )
+  );
+
+-- RPC: richiedi correzione su un match già confermato
+create or replace function public.request_correction(
+  match_id_param  uuid,
+  new_sets        jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.matches
+    set correction_requested_by = (select auth.uid()),
+        correction_sets         = new_sets,
+        correction_status       = 'pending'
+    where id = match_id_param
+      and status = 'confirmed'
+      and (player_1_id = (select auth.uid()) or player_2_id = (select auth.uid()))
+      and (correction_status is null or correction_status in ('rejected', 'approved'));
+end;
+$$;
+
+-- RPC: approva la correzione (ricalcola Elo con i nuovi punteggi)
+create or replace function public.approve_correction(match_id_param uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  m          record;
+  p1_rating  integer;
+  p2_rating  integer;
+  set_item   jsonb;
+  sets_p1    integer;
+  sets_p2    integer;
+  e_a        float;
+  e_b        float;
+  change_a   integer;
+  change_b   integer;
+  k          integer := 32;
+begin
+  select * into m from public.matches where id = match_id_param;
+
+  if m.correction_status <> 'pending' then
+    raise exception 'Nessuna correzione in attesa';
+  end if;
+
+  if m.correction_requested_by = (select auth.uid()) then
+    raise exception 'Non puoi approvare la tua stessa richiesta';
+  end if;
+
+  if (select auth.uid()) <> m.player_1_id and (select auth.uid()) <> m.player_2_id then
+    raise exception 'Non sei un giocatore di questo match';
+  end if;
+
+  -- Reversa le modifiche Elo precedenti
+  update public.profiles
+    set elo_rating = greatest(0, elo_rating - m.elo_change_p1)
+    where id = m.player_1_id;
+
+  update public.profiles
+    set elo_rating = greatest(0, elo_rating - m.elo_change_p2)
+    where id = m.player_2_id;
+
+  -- Aggiorna i set con i nuovi punteggi proposti
+  for set_item in select * from jsonb_array_elements(m.correction_sets)
+  loop
+    update public.sets
+      set score_p1 = (set_item->>'score_p1')::integer,
+          score_p2 = (set_item->>'score_p2')::integer
+      where match_id = match_id_param
+        and set_number = (set_item->>'set_number')::integer;
+  end loop;
+
+  -- Conta i nuovi set vinti
+  select
+    count(*) filter (where score_p1 > score_p2),
+    count(*) filter (where score_p2 > score_p1)
+  into sets_p1, sets_p2
+  from public.sets
+  where match_id = match_id_param;
+
+  -- Leggi i rating aggiornati (dopo la reversa)
+  select elo_rating into p1_rating from public.profiles where id = m.player_1_id;
+  select elo_rating into p2_rating from public.profiles where id = m.player_2_id;
+
+  -- Ricalcola Elo
+  e_a := 1.0 / (1.0 + power(10.0, (p2_rating - p1_rating)::float / 400.0));
+  e_b := 1.0 / (1.0 + power(10.0, (p1_rating - p2_rating)::float / 400.0));
+
+  if sets_p1 > sets_p2 then
+    change_a := round(k * (1.0 - e_a));
+    change_b := round(k * (0.0 - e_b));
+  else
+    change_a := round(k * (0.0 - e_a));
+    change_b := round(k * (1.0 - e_b));
+  end if;
+
+  -- Applica nuovi Elo
+  update public.profiles
+    set elo_rating = greatest(0, elo_rating + change_a)
+    where id = m.player_1_id;
+
+  update public.profiles
+    set elo_rating = greatest(0, elo_rating + change_b)
+    where id = m.player_2_id;
+
+  -- Aggiorna il match con i nuovi delta e azzera la richiesta
+  update public.matches
+    set elo_change_p1           = change_a,
+        elo_change_p2           = change_b,
+        correction_status       = 'approved',
+        correction_requested_by = null,
+        correction_sets         = null
+    where id = match_id_param;
+end;
+$$;
+
+-- RPC: rifiuta la correzione
+create or replace function public.reject_correction(match_id_param uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.matches
+    set correction_status       = 'rejected',
+        correction_requested_by = null,
+        correction_sets         = null
+    where id = match_id_param
+      and correction_status = 'pending'
+      and (player_1_id = (select auth.uid()) or player_2_id = (select auth.uid()));
+end;
+$$;

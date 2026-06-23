@@ -2,13 +2,21 @@ import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { dbService, type MatchWithSets } from '../services/db'
 import { useAppStore } from '../store/useAppStore'
-import { Calendar, ShieldAlert } from 'lucide-react'
+import { Calendar, ShieldAlert, Pencil, Clock, CheckCircle, XCircle } from 'lucide-react'
+
+interface CorrectionModal {
+	match: MatchWithSets
+	sets: { score_p1: string; score_p2: string }[]
+}
 
 export const MatchesScreen: React.FC = () => {
 	const { t } = useTranslation()
 	const { currentUser, refreshProfile } = useAppStore()
 	const [matches, setMatches] = useState<MatchWithSets[]>([])
 	const [isLoading, setIsLoading] = useState(true)
+	const [correctionModal, setCorrectionModal] = useState<CorrectionModal | null>(null)
+	const [correctionError, setCorrectionError] = useState<string | null>(null)
+	const [isSubmittingCorrection, setIsSubmittingCorrection] = useState(false)
 
 	const fetchMatches = async () => {
 		setIsLoading(true)
@@ -50,26 +58,111 @@ export const MatchesScreen: React.FC = () => {
 		}
 	}
 
+	const openCorrectionModal = (match: MatchWithSets) => {
+		setCorrectionError(null)
+		setCorrectionModal({
+			match,
+			sets: match.sets.map(s => ({
+				score_p1: String(s.score_p1),
+				score_p2: String(s.score_p2),
+			})),
+		})
+	}
+
+	const validateCorrectionSets = (sets: { score_p1: string; score_p2: string }[]) => {
+		for (let i = 0; i < sets.length; i++) {
+			const p1 = parseInt(sets[i].score_p1)
+			const p2 = parseInt(sets[i].score_p2)
+			const label = `Set ${i + 1}:`
+			if (isNaN(p1) || isNaN(p2) || p1 < 0 || p2 < 0)
+				return `${label} ${t('matches.correctionValidInvalid')}`
+			if (p1 === p2) return `${label} ${t('matches.correctionValidEqual')}`
+			const max = Math.max(p1, p2)
+			const min = Math.min(p1, p2)
+			if (max < 11) return `${label} ${t('matches.correctionValidMin11')}`
+			if (max - min < 2) return `${label} ${t('matches.correctionValidMargin')}`
+		}
+		return null
+	}
+
+	const handleSubmitCorrection = async () => {
+		if (!correctionModal) return
+		const err = validateCorrectionSets(correctionModal.sets)
+		if (err) {
+			setCorrectionError(err)
+			return
+		}
+
+		setIsSubmittingCorrection(true)
+		try {
+			const newSets = correctionModal.match.sets.map((s, i) => ({
+				set_number: s.set_number,
+				score_p1: parseInt(correctionModal.sets[i].score_p1),
+				score_p2: parseInt(correctionModal.sets[i].score_p2),
+			}))
+			await dbService.requestCorrection(correctionModal.match.id, newSets)
+			setCorrectionModal(null)
+			await fetchMatches()
+		} catch (e) {
+			setCorrectionError((e as Error).message)
+		} finally {
+			setIsSubmittingCorrection(false)
+		}
+	}
+
+	const handleApproveCorrection = async (matchId: string) => {
+		try {
+			await dbService.approveCorrection(matchId)
+			await fetchMatches()
+			await refreshProfile()
+		} catch (err) {
+			alert(t('matches.correctionErrorApprove') + (err as Error).message)
+		}
+	}
+
+	const handleRejectCorrection = async (matchId: string) => {
+		if (confirm(t('matches.correctionRejectConfirm'))) {
+			try {
+				await dbService.rejectCorrection(matchId)
+				await fetchMatches()
+			} catch (err) {
+				alert(t('matches.correctionErrorReject') + (err as Error).message)
+			}
+		}
+	}
+
 	const pendingRequests = matches.filter(
 		m => m.status === 'pending' && m.player_2_id === currentUser?.id
 	)
-
 	const pendingSent = matches.filter(
 		m => m.status === 'pending' && m.player_1_id === currentUser?.id
 	)
-
 	const confirmedMatches = matches.filter(m => m.status === 'confirmed')
 	const disputedMatches = matches.filter(m => m.status === 'disputed')
 
+	const pendingCorrections = matches.filter(
+		m =>
+			m.status === 'confirmed' &&
+			m.correction_status === 'pending' &&
+			m.correction_requested_by !== currentUser?.id &&
+			(m.player_1_id === currentUser?.id || m.player_2_id === currentUser?.id)
+	)
+
 	const getSetsScore = (sets: any[]) => {
-		let p1 = 0
-		let p2 = 0
+		let p1 = 0,
+			p2 = 0
 		sets.forEach(s => {
 			if (s.score_p1 > s.score_p2) p1++
 			else p2++
 		})
 		return { p1, p2 }
 	}
+
+	const isMyMatch = (match: MatchWithSets) =>
+		currentUser?.id === match.player_1_id || currentUser?.id === match.player_2_id
+
+	const canRequestCorrection = (match: MatchWithSets) =>
+		isMyMatch(match) && match.correction_status !== 'pending'
 
 	return (
 		<div className="flex flex-col h-full bg-base-100 text-white">
@@ -86,6 +179,122 @@ export const MatchesScreen: React.FC = () => {
 				</div>
 			) : (
 				<div className="flex-1 overflow-y-auto px-4 pb-24 space-y-6">
+					{/* Correzioni da approvare */}
+					{pendingCorrections.length > 0 && (
+						<div className="space-y-2">
+							<h3 className="text-xs font-bold uppercase tracking-wider text-orange-400 flex items-center gap-1">
+								<Pencil className="w-3 h-3" />
+								{t('matches.correctionSectionTitle')} ({pendingCorrections.length})
+							</h3>
+							<div className="space-y-3">
+								{pendingCorrections.map(match => {
+									const opponent =
+										match.player_1_id === match.correction_requested_by
+											? match.player1
+											: match.player2
+									const currentSets = getSetsScore(match.sets)
+									const proposedSets = match.correction_sets
+										? (() => {
+												let p1 = 0,
+													p2 = 0
+												match.correction_sets!.forEach(s => {
+													if (s.score_p1 > s.score_p2) p1++
+													else p2++
+												})
+												return { p1, p2 }
+											})()
+										: null
+
+									return (
+										<div
+											key={match.id}
+											className="p-4 rounded-2xl bg-slate-900 border border-orange-400/25 shadow-md"
+										>
+											<div className="flex justify-between items-start mb-3">
+												<span className="badge badge-sm font-extrabold text-[10px] text-white bg-orange-500 border-none">
+													{t('matches.correctionBadge')}
+												</span>
+												<span className="text-[10px] text-slate-500 flex items-center gap-1">
+													<Calendar className="w-3 h-3" />
+													{new Date(
+														match.created_at
+													).toLocaleDateString()}
+												</span>
+											</div>
+
+											<p className="text-sm mb-3">
+												<span className="font-extrabold text-slate-200">
+													{opponent?.display_name}
+												</span>{' '}
+												{t('matches.correctionIntro')}
+											</p>
+
+											<div className="bg-slate-950/60 rounded-xl border border-slate-800/80 overflow-hidden mb-4">
+												<div className="flex justify-between items-center px-4 py-2 border-b border-slate-800/60">
+													<span className="text-[10px] text-slate-500 uppercase font-bold">
+														{t('matches.correctionCurrentLabel')}
+													</span>
+													<span className="font-mono text-sm text-slate-300 font-bold">
+														{currentSets.p1} – {currentSets.p2}
+													</span>
+												</div>
+												{proposedSets && (
+													<div className="flex justify-between items-center px-4 py-2.5">
+														<span className="text-[10px] text-orange-400 uppercase font-bold">
+															{t('matches.correctionProposedLabel')}
+														</span>
+														<div className="flex flex-col items-end gap-1">
+															<span className="font-mono text-sm text-orange-300 font-bold">
+																{proposedSets.p1} –{' '}
+																{proposedSets.p2}
+															</span>
+															{match.correction_sets && (
+																<div className="flex flex-wrap gap-1 justify-end">
+																	{match.correction_sets.map(
+																		(s, i) => (
+																			<span
+																				key={i}
+																				className="bg-orange-950/50 border border-orange-800/40 px-1.5 py-0.5 rounded text-[9px] font-mono text-orange-300"
+																			>
+																				S{s.set_number}:{' '}
+																				{s.score_p1}-
+																				{s.score_p2}
+																			</span>
+																		)
+																	)}
+																</div>
+															)}
+														</div>
+													</div>
+												)}
+											</div>
+
+											<div className="flex gap-2">
+												<button
+													onClick={() =>
+														handleApproveCorrection(match.id)
+													}
+													className="btn btn-success btn-sm flex-1 text-white font-bold gap-1"
+												>
+													<CheckCircle className="w-3.5 h-3.5" />
+													{t('matches.correctionApprove')}
+												</button>
+												<button
+													onClick={() => handleRejectCorrection(match.id)}
+													className="btn btn-outline btn-error btn-sm flex-1 font-bold gap-1"
+												>
+													<XCircle className="w-3.5 h-3.5" />
+													{t('matches.correctionReject')}
+												</button>
+											</div>
+										</div>
+									)
+								})}
+							</div>
+						</div>
+					)}
+
+					{/* Richieste di conferma in arrivo */}
 					{pendingRequests.length > 0 && (
 						<div className="space-y-2">
 							<h3 className="text-xs font-bold uppercase tracking-wider text-primary">
@@ -130,7 +339,6 @@ export const MatchesScreen: React.FC = () => {
 														{t('common.you')}
 													</span>
 												</div>
-
 												<div className="flex flex-wrap gap-2 justify-center text-xs">
 													{match.sets.map((set, idx) => (
 														<span
@@ -167,6 +375,7 @@ export const MatchesScreen: React.FC = () => {
 						</div>
 					)}
 
+					{/* In attesa di conferma avversario */}
 					{pendingSent.length > 0 && (
 						<div className="space-y-2">
 							<h3 className="text-xs font-bold uppercase tracking-wider text-warning">
@@ -201,6 +410,7 @@ export const MatchesScreen: React.FC = () => {
 						</div>
 					)}
 
+					{/* Partite confermate */}
 					<div className="space-y-2">
 						<h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
 							{t('matches.confirmedTitle')} ({confirmedMatches.length})
@@ -215,117 +425,158 @@ export const MatchesScreen: React.FC = () => {
 								{confirmedMatches.map(match => {
 									const { p1, p2 } = getSetsScore(match.sets)
 									const isP1Winner = p1 > p2
+									const iAmRequester =
+										match.correction_requested_by === currentUser?.id
+									const hasPendingCorrection =
+										match.correction_status === 'pending'
 
 									return (
 										<div
 											key={match.id}
-											className="p-4 rounded-2xl bg-neutral/85 border border-slate-800/80 shadow-sm"
+											className="rounded-2xl bg-neutral/85 border border-slate-800/80 shadow-sm overflow-hidden"
 										>
-											<div className="flex justify-between items-center text-[10px] text-slate-500 mb-3 border-b border-slate-800 pb-2">
-												<span className="font-mono">
-													{t('matches.matchId')}
-													{match.id.substring(0, 8)}
-												</span>
-												<span className="flex items-center gap-1">
-													<Calendar className="w-3 h-3" />
-													{new Date(
-														match.created_at
-													).toLocaleDateString()}
-												</span>
-											</div>
+											<div className="px-4 pt-4 pb-3">
+												<div className="flex justify-between items-center text-[10px] text-slate-500 mb-3 border-b border-slate-800 pb-2">
+													<span className="font-mono">
+														{t('matches.matchId')}
+														{match.id.substring(0, 8)}
+													</span>
+													<span className="flex items-center gap-1">
+														<Calendar className="w-3 h-3" />
+														{new Date(
+															match.created_at
+														).toLocaleDateString()}
+													</span>
+												</div>
 
-											<div className="grid grid-cols-7 items-center mb-3">
-												<div className="col-span-2 flex flex-col items-center text-center">
-													<div className="w-10 h-10 rounded-full overflow-hidden bg-slate-800 border border-slate-700 mb-1 flex items-center justify-center shrink-0">
-														{match.player1?.avatar_url ? (
-															<img
-																src={match.player1.avatar_url}
-																alt=""
-																className="w-full h-full object-cover"
-															/>
-														) : (
-															<span className="text-xs font-extrabold">
-																{match.player1?.display_name.substring(
-																	0,
-																	2
-																)}
+												<div className="grid grid-cols-7 items-center mb-3">
+													<div className="col-span-2 flex flex-col items-center text-center">
+														<div className="w-10 h-10 rounded-full overflow-hidden bg-slate-800 border border-slate-700 mb-1 flex items-center justify-center shrink-0">
+															{match.player1?.avatar_url ? (
+																<img
+																	src={match.player1.avatar_url}
+																	alt=""
+																	className="w-full h-full object-cover"
+																/>
+															) : (
+																<span className="text-xs font-extrabold">
+																	{match.player1?.display_name.substring(
+																		0,
+																		2
+																	)}
+																</span>
+															)}
+														</div>
+														<span
+															className={`text-[10px] truncate max-w-full font-bold ${isP1Winner ? 'text-yellow-400' : 'text-slate-400'}`}
+														>
+															{match.player1?.display_name}
+														</span>
+														{match.elo_change_p1 !== null && (
+															<span
+																className={`text-[10px] font-extrabold mt-0.5 ${match.elo_change_p1 >= 0 ? 'text-success' : 'text-error'}`}
+															>
+																{match.elo_change_p1 >= 0
+																	? `+${match.elo_change_p1}`
+																	: match.elo_change_p1}{' '}
+																{t('common.elo')}
 															</span>
 														)}
 													</div>
-													<span
-														className={`text-[10px] truncate max-w-full font-bold ${isP1Winner ? 'text-yellow-400 font-extrabold' : 'text-slate-400'}`}
-													>
-														{match.player1?.display_name}
-													</span>
-													{match.elo_change_p1 !== null && (
-														<span
-															className={`text-[10px] font-extrabold mt-0.5 ${match.elo_change_p1 >= 0 ? 'text-success' : 'text-error'}`}
-														>
-															{match.elo_change_p1 >= 0
-																? `+${match.elo_change_p1}`
-																: match.elo_change_p1}{' '}
-															{t('common.elo')}
+
+													<div className="col-span-3 flex flex-col items-center justify-center">
+														<span className="text-xl font-black text-white bg-slate-950 px-4 py-1 rounded-xl border border-slate-850">
+															{p1} - {p2}
 														</span>
-													)}
-												</div>
+														<span className="text-[9px] text-slate-500 mt-1 uppercase font-semibold">
+															{t('common.bestOf')} {match.best_of}
+														</span>
+													</div>
 
-												<div className="col-span-3 flex flex-col items-center justify-center">
-													<span className="text-xl font-black text-white bg-slate-950 px-4 py-1 rounded-xl border border-slate-850">
-														{p1} - {p2}
-													</span>
-													<span className="text-[9px] text-slate-500 mt-1 uppercase font-semibold">
-														{t('common.bestOf')} {match.best_of}
-													</span>
-												</div>
-
-												<div className="col-span-2 flex flex-col items-center text-center">
-													<div className="w-10 h-10 rounded-full overflow-hidden bg-slate-800 border border-slate-700 mb-1 flex items-center justify-center shrink-0">
-														{match.player2?.avatar_url ? (
-															<img
-																src={match.player2.avatar_url}
-																alt=""
-																className="w-full h-full object-cover"
-															/>
-														) : (
-															<span className="text-xs font-extrabold">
-																{match.player2?.display_name.substring(
-																	0,
-																	2
-																)}
+													<div className="col-span-2 flex flex-col items-center text-center">
+														<div className="w-10 h-10 rounded-full overflow-hidden bg-slate-800 border border-slate-700 mb-1 flex items-center justify-center shrink-0">
+															{match.player2?.avatar_url ? (
+																<img
+																	src={match.player2.avatar_url}
+																	alt=""
+																	className="w-full h-full object-cover"
+																/>
+															) : (
+																<span className="text-xs font-extrabold">
+																	{match.player2?.display_name.substring(
+																		0,
+																		2
+																	)}
+																</span>
+															)}
+														</div>
+														<span
+															className={`text-[10px] truncate max-w-full font-bold ${!isP1Winner ? 'text-yellow-400' : 'text-slate-400'}`}
+														>
+															{match.player2?.display_name}
+														</span>
+														{match.elo_change_p2 !== null && (
+															<span
+																className={`text-[10px] font-extrabold mt-0.5 ${match.elo_change_p2 >= 0 ? 'text-success' : 'text-error'}`}
+															>
+																{match.elo_change_p2 >= 0
+																	? `+${match.elo_change_p2}`
+																	: match.elo_change_p2}{' '}
+																{t('common.elo')}
 															</span>
 														)}
 													</div>
-													<span
-														className={`text-[10px] truncate max-w-full font-bold ${!isP1Winner ? 'text-yellow-400 font-extrabold' : 'text-slate-400'}`}
-													>
-														{match.player2?.display_name}
-													</span>
-													{match.elo_change_p2 !== null && (
+												</div>
+
+												<div className="flex gap-1.5 justify-center mt-3 pt-2.5 border-t border-slate-800/40 text-[10px] text-slate-400">
+													{match.sets.map((set, idx) => (
 														<span
-															className={`text-[10px] font-extrabold mt-0.5 ${match.elo_change_p2 >= 0 ? 'text-success' : 'text-error'}`}
+															key={set.id}
+															className="bg-slate-950 px-2.5 py-1 rounded-md font-mono border border-slate-850"
 														>
-															{match.elo_change_p2 >= 0
-																? `+${match.elo_change_p2}`
-																: match.elo_change_p2}{' '}
-															{t('common.elo')}
+															{t('common.set')} {idx + 1}:{' '}
+															<strong className="text-slate-200">
+																{set.score_p1}-{set.score_p2}
+															</strong>
 														</span>
-													)}
+													))}
 												</div>
 											</div>
 
-											<div className="flex gap-1.5 justify-center mt-3 pt-2.5 border-t border-slate-800/40 text-[10px] text-slate-400">
-												{match.sets.map((set, idx) => (
-													<span
-														key={set.id}
-														className="bg-slate-950 px-2.5 py-1 rounded-md font-mono border border-slate-850"
-													>
-														{t('common.set')} {idx + 1}:{' '}
-														<strong className="text-slate-200">
-															{set.score_p1}-{set.score_p2}
-														</strong>
-													</span>
-												))}
-											</div>
+											{/* Footer correzione */}
+											{isMyMatch(match) && (
+												<div
+													className={`px-4 py-2.5 border-t border-slate-800/60 ${hasPendingCorrection ? 'bg-orange-950/20' : 'bg-transparent'}`}
+												>
+													{hasPendingCorrection && iAmRequester ? (
+														<div className="flex items-center justify-center gap-1.5 text-[11px] text-orange-400">
+															<Clock className="w-3 h-3 shrink-0" />
+															<span>
+																{t('matches.correctionSentWaiting')}
+															</span>
+														</div>
+													) : hasPendingCorrection ? (
+														<div className="flex items-center justify-center gap-1.5 text-[11px] text-orange-400">
+															<Clock className="w-3 h-3 shrink-0" />
+															<span>
+																{t(
+																	'matches.correctionOpponentPending'
+																)}
+															</span>
+														</div>
+													) : canRequestCorrection(match) ? (
+														<button
+															onClick={() =>
+																openCorrectionModal(match)
+															}
+															className="w-full flex items-center justify-center gap-1.5 text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
+														>
+															<Pencil className="w-3 h-3" />
+															{t('matches.correctionRequestButton')}
+														</button>
+													) : null}
+												</div>
+											)}
 										</div>
 									)
 								})}
@@ -333,6 +584,7 @@ export const MatchesScreen: React.FC = () => {
 						)}
 					</div>
 
+					{/* Partite contestate */}
 					{disputedMatches.length > 0 && (
 						<div className="space-y-2">
 							<h3 className="text-xs font-bold uppercase tracking-wider text-error flex items-center gap-1">
@@ -365,6 +617,115 @@ export const MatchesScreen: React.FC = () => {
 							</div>
 						</div>
 					)}
+				</div>
+			)}
+
+			{/* Modale correzione punteggi */}
+			{correctionModal && (
+				<div
+					className="fixed inset-0 z-50 flex items-center justify-center p-5"
+					style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}
+					onClick={e => {
+						if (e.target === e.currentTarget) setCorrectionModal(null)
+					}}
+				>
+					<div className="w-full max-w-sm bg-slate-900 rounded-2xl shadow-2xl border border-slate-700 overflow-hidden">
+						{/* Header modale */}
+						<div className="px-6 pt-6 pb-4 border-b border-slate-800">
+							<div className="flex items-center gap-2 mb-1.5">
+								<Pencil className="w-4 h-4 text-orange-400 shrink-0" />
+								<h3 className="text-base font-bold text-white">
+									{t('matches.correctionModalTitle')}
+								</h3>
+							</div>
+							<p className="text-xs text-slate-400 leading-relaxed">
+								{t('matches.correctionModalSubtitle')}
+							</p>
+						</div>
+
+						{/* Corpo modale */}
+						<div className="px-6 py-5 space-y-3">
+							{/* Intestazioni colonne */}
+							<div className="grid grid-cols-[3rem_1fr_1rem_1fr] items-center gap-2 mb-1">
+								<span />
+								<span className="text-center text-[10px] text-slate-500 font-bold uppercase truncate">
+									{correctionModal.match.player1?.display_name}
+								</span>
+								<span />
+								<span className="text-center text-[10px] text-slate-500 font-bold uppercase truncate">
+									{correctionModal.match.player2?.display_name}
+								</span>
+							</div>
+
+							{correctionModal.sets.map((set, idx) => (
+								<div
+									key={idx}
+									className="grid grid-cols-[3rem_1fr_1rem_1fr] items-center gap-2"
+								>
+									<span className="text-[10px] text-slate-500 font-mono text-center">
+										{t('common.set')} {idx + 1}
+									</span>
+									<input
+										type="number"
+										min="0"
+										value={set.score_p1}
+										onChange={e => {
+											const next = correctionModal.sets.map((s, i) =>
+												i === idx ? { ...s, score_p1: e.target.value } : s
+											)
+											setCorrectionModal({ ...correctionModal, sets: next })
+											setCorrectionError(null)
+										}}
+										className="input input-sm w-full text-center bg-slate-800 border-slate-700 text-white focus:border-orange-400 focus:outline-none"
+									/>
+									<span className="text-center text-slate-500 font-bold text-xs">
+										–
+									</span>
+									<input
+										type="number"
+										min="0"
+										value={set.score_p2}
+										onChange={e => {
+											const next = correctionModal.sets.map((s, i) =>
+												i === idx ? { ...s, score_p2: e.target.value } : s
+											)
+											setCorrectionModal({ ...correctionModal, sets: next })
+											setCorrectionError(null)
+										}}
+										className="input input-sm w-full text-center bg-slate-800 border-slate-700 text-white focus:border-orange-400 focus:outline-none"
+									/>
+								</div>
+							))}
+
+							{correctionError && (
+								<p className="text-xs text-error text-center pt-1">
+									{correctionError}
+								</p>
+							)}
+						</div>
+
+						{/* Footer modale */}
+						<div className="px-6 pb-6 flex gap-3">
+							<button
+								onClick={() => setCorrectionModal(null)}
+								disabled={isSubmittingCorrection}
+								className="btn btn-ghost flex-1 border border-slate-700 text-slate-300 hover:bg-slate-800 hover:border-slate-600"
+							>
+								{t('matches.correctionModalCancel')}
+							</button>
+							<button
+								onClick={handleSubmitCorrection}
+								disabled={isSubmittingCorrection}
+								className="btn flex-1 font-bold bg-orange-500 hover:bg-orange-400 text-white border-none shadow-lg"
+							>
+								{isSubmittingCorrection ? (
+									<span className="loading loading-spinner loading-xs" />
+								) : (
+									t('matches.correctionModalSend')
+								)}
+							</button>
+						</div>
+					</div>
 				</div>
 			)}
 		</div>

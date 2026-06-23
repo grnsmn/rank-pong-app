@@ -20,6 +20,9 @@ export interface Match {
 	status: 'pending' | 'confirmed' | 'disputed'
 	elo_change_p1: number | null
 	elo_change_p2: number | null
+	correction_requested_by: string | null
+	correction_sets: { set_number: number; score_p1: number; score_p2: number }[] | null
+	correction_status: 'pending' | 'approved' | 'rejected' | null
 	created_at: string
 	player1?: Profile
 	player2?: Profile
@@ -98,6 +101,9 @@ const INITIAL_MOCK_MATCHES: MatchWithSets[] = [
 		status: 'confirmed',
 		elo_change_p1: 15,
 		elo_change_p2: -15,
+		correction_requested_by: null,
+		correction_sets: null,
+		correction_status: null,
 		created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
 		sets: [
 			{ id: 'set-1-1', match_id: 'match-1', set_number: 1, score_p1: 11, score_p2: 8 },
@@ -360,6 +366,9 @@ export const dbService = {
 			return matches
 				.map(match => ({
 					...match,
+					correction_requested_by: match.correction_requested_by ?? null,
+					correction_sets: match.correction_sets ?? null,
+					correction_status: match.correction_status ?? null,
 					player1: profiles.find(p => p.id === match.player_1_id),
 					player2: profiles.find(p => p.id === match.player_2_id),
 				}))
@@ -551,6 +560,144 @@ export const dbService = {
 			matches[matchIndex].status = 'disputed'
 			localStorage.setItem('rp_matches', JSON.stringify(matches))
 			return matches[matchIndex]
+		}
+	},
+
+	async requestCorrection(
+		matchId: string,
+		newSets: { set_number: number; score_p1: number; score_p2: number }[]
+	): Promise<void> {
+		const currentUser = await this.getCurrentUser()
+		if (!currentUser) throw new Error('Devi essere autenticato')
+
+		if (isSupabaseConfigured && supabase) {
+			const { error } = await supabase.rpc('request_correction', {
+				match_id_param: matchId,
+				new_sets: newSets,
+			})
+			if (error) throw error
+		} else {
+			const matches = JSON.parse(
+				localStorage.getItem('rp_matches') || '[]'
+			) as MatchWithSets[]
+			const idx = matches.findIndex(m => m.id === matchId)
+			if (idx === -1) throw new Error('Match non trovato')
+			const m = matches[idx]
+			if (m.status !== 'confirmed')
+				throw new Error('Solo i match confermati possono essere corretti')
+			if (m.correction_status === 'pending') throw new Error('Correzione già in attesa')
+			if (currentUser.id !== m.player_1_id && currentUser.id !== m.player_2_id)
+				throw new Error('Non sei un giocatore di questo match')
+
+			matches[idx].correction_requested_by = currentUser.id
+			matches[idx].correction_sets = newSets
+			matches[idx].correction_status = 'pending'
+			localStorage.setItem('rp_matches', JSON.stringify(matches))
+		}
+	},
+
+	async approveCorrection(matchId: string): Promise<void> {
+		const currentUser = await this.getCurrentUser()
+		if (!currentUser) throw new Error('Devi essere autenticato')
+
+		if (isSupabaseConfigured && supabase) {
+			const { error } = await supabase.rpc('approve_correction', {
+				match_id_param: matchId,
+			})
+			if (error) throw error
+		} else {
+			const matches = JSON.parse(
+				localStorage.getItem('rp_matches') || '[]'
+			) as MatchWithSets[]
+			const profiles = JSON.parse(localStorage.getItem('rp_profiles') || '[]') as Profile[]
+			const idx = matches.findIndex(m => m.id === matchId)
+			if (idx === -1) throw new Error('Match non trovato')
+			const m = matches[idx]
+
+			if (m.correction_status !== 'pending') throw new Error('Nessuna correzione in attesa')
+			if (m.correction_requested_by === currentUser.id)
+				throw new Error('Non puoi approvare la tua stessa richiesta')
+			if (currentUser.id !== m.player_1_id && currentUser.id !== m.player_2_id)
+				throw new Error('Non sei un giocatore di questo match')
+
+			const profile1 = profiles.find(p => p.id === m.player_1_id)!
+			const profile2 = profiles.find(p => p.id === m.player_2_id)!
+
+			// Reversa Elo precedente
+			profile1.elo_rating = Math.max(0, profile1.elo_rating - (m.elo_change_p1 ?? 0))
+			profile2.elo_rating = Math.max(0, profile2.elo_rating - (m.elo_change_p2 ?? 0))
+
+			// Aggiorna i set con i nuovi punteggi
+			const newSets = m.correction_sets!
+			newSets.forEach(ns => {
+				const s = matches[idx].sets.find(s => s.set_number === ns.set_number)
+				if (s) {
+					s.score_p1 = ns.score_p1
+					s.score_p2 = ns.score_p2
+				}
+			})
+
+			// Ricalcola set vinti
+			let setsP1 = 0,
+				setsP2 = 0
+			matches[idx].sets.forEach(s => {
+				if (s.score_p1 > s.score_p2) setsP1++
+				else setsP2++
+			})
+
+			// Ricalcola Elo
+			const { changeA, changeB } = calculateEloTS(
+				profile1.elo_rating,
+				profile2.elo_rating,
+				setsP1,
+				setsP2
+			)
+
+			profile1.elo_rating = Math.max(0, profile1.elo_rating + changeA)
+			profile2.elo_rating = Math.max(0, profile2.elo_rating + changeB)
+
+			matches[idx].elo_change_p1 = changeA
+			matches[idx].elo_change_p2 = changeB
+			matches[idx].correction_status = 'approved'
+			matches[idx].correction_requested_by = null
+			matches[idx].correction_sets = null
+
+			localStorage.setItem('rp_matches', JSON.stringify(matches))
+			localStorage.setItem('rp_profiles', JSON.stringify(profiles))
+
+			// Aggiorna sessione se il profilo corrente è coinvolto
+			const session = JSON.parse(
+				localStorage.getItem('rp_session') || 'null'
+			) as Profile | null
+			if (session) {
+				if (session.id === profile1.id)
+					localStorage.setItem('rp_session', JSON.stringify(profile1))
+				else if (session.id === profile2.id)
+					localStorage.setItem('rp_session', JSON.stringify(profile2))
+			}
+		}
+	},
+
+	async rejectCorrection(matchId: string): Promise<void> {
+		const currentUser = await this.getCurrentUser()
+		if (!currentUser) throw new Error('Devi essere autenticato')
+
+		if (isSupabaseConfigured && supabase) {
+			const { error } = await supabase.rpc('reject_correction', {
+				match_id_param: matchId,
+			})
+			if (error) throw error
+		} else {
+			const matches = JSON.parse(
+				localStorage.getItem('rp_matches') || '[]'
+			) as MatchWithSets[]
+			const idx = matches.findIndex(m => m.id === matchId)
+			if (idx === -1) throw new Error('Match non trovato')
+
+			matches[idx].correction_status = 'rejected'
+			matches[idx].correction_requested_by = null
+			matches[idx].correction_sets = null
+			localStorage.setItem('rp_matches', JSON.stringify(matches))
 		}
 	},
 

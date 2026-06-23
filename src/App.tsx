@@ -33,10 +33,17 @@ export const App: React.FC = () => {
 		if (!currentUser) return
 		try {
 			const matches = await dbService.getMatches()
-			const count = matches.filter(
+			const pendingMatches = matches.filter(
 				m => m.status === 'pending' && m.player_2_id === currentUser.id
 			).length
-			setPendingCount(count)
+			const pendingCorrections = matches.filter(
+				m =>
+					m.status === 'confirmed' &&
+					m.correction_status === 'pending' &&
+					m.correction_requested_by !== currentUser.id &&
+					(m.player_1_id === currentUser.id || m.player_2_id === currentUser.id)
+			).length
+			setPendingCount(pendingMatches + pendingCorrections)
 		} catch (err) {
 			console.error('Errore conteggio notifiche:', err)
 		}
