@@ -436,6 +436,9 @@ export const dbService = {
 				elo_change_p1: null,
 				elo_change_p2: null,
 				created_at: new Date().toISOString(),
+				correction_requested_by: null,
+				correction_sets: null,
+				correction_status: null,
 				sets: setScores.map((set, index) => ({
 					id: `set-mock-${index}-${Math.random()}`,
 					match_id: '',
