@@ -1,37 +1,29 @@
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import { useTranslation } from 'react-i18next'
 import { dbService, type Profile } from '../services/db'
+import { useDataFetch } from '../hooks/useDataFetch'
+import { useSearch } from '../hooks/useSearch'
 import { Trophy, Medal, Search, User } from 'lucide-react'
 
-export const LeaderboardScreen: React.FC = () => {
+interface Props {
+	onPlayerSelect?: (playerId: string) => void
+}
+
+export const LeaderboardScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 	const { t } = useTranslation()
-	const [profiles, setProfiles] = useState<Profile[]>([])
-	const [search, setSearch] = useState('')
-	const [isLoading, setIsLoading] = useState(true)
 
-	const fetchLeaderboard = async () => {
-		setIsLoading(true)
-		try {
-			const data = await dbService.getProfiles()
-			setProfiles(data)
-		} catch (err) {
-			console.error('Errore caricamento classifica:', err)
-		} finally {
-			setIsLoading(false)
-		}
-	}
+	const { data, isLoading } = useDataFetch(() => dbService.getProfiles(), {
+		refetchOnFocus: true,
+	})
+	const profiles = data ?? []
 
-	useEffect(() => {
-		fetchLeaderboard()
-		const handleFocus = () => fetchLeaderboard()
-		window.addEventListener('focus', handleFocus)
-		return () => window.removeEventListener('focus', handleFocus)
-	}, [])
-
-	const filteredProfiles = profiles.filter(
-		p =>
-			p.display_name.toLowerCase().includes(search.toLowerCase()) ||
-			p.username.toLowerCase().includes(search.toLowerCase())
+	const {
+		search,
+		setSearch,
+		filtered: filteredProfiles,
+	} = useSearch<Profile>(
+		profiles,
+		(p, q) => p.display_name.toLowerCase().includes(q) || p.username.toLowerCase().includes(q)
 	)
 
 	const getPlayerTypeBadge = (type: string) => {
@@ -112,7 +104,10 @@ export const LeaderboardScreen: React.FC = () => {
 					{search === '' && topThree.length > 0 && (
 						<div className="flex justify-center items-end gap-2 pt-6 pb-4 bg-slate-900/40 rounded-2xl border border-slate-800 px-2">
 							{topThree[1] && (
-								<div className="flex flex-col items-center w-1/3">
+								<div
+									className="flex flex-col items-center w-1/3 cursor-pointer"
+									onClick={() => onPlayerSelect?.(topThree[1].id)}
+								>
 									<div className="relative">
 										<div className="w-12 h-12 rounded-full border-2 border-slate-300 overflow-hidden bg-slate-800 flex items-center justify-center">
 											{topThree[1].avatar_url ? (
@@ -142,7 +137,10 @@ export const LeaderboardScreen: React.FC = () => {
 							)}
 
 							{topThree[0] && (
-								<div className="flex flex-col items-center w-1/3 z-10 -translate-y-2">
+								<div
+									className="flex flex-col items-center w-1/3 z-10 -translate-y-2 cursor-pointer"
+									onClick={() => onPlayerSelect?.(topThree[0].id)}
+								>
 									<div className="relative">
 										<div className="absolute -top-5 left-1/2 -translate-x-1/2">
 											<Trophy className="w-6 h-6 text-yellow-400" />
@@ -175,7 +173,10 @@ export const LeaderboardScreen: React.FC = () => {
 							)}
 
 							{topThree[2] && (
-								<div className="flex flex-col items-center w-1/3">
+								<div
+									className="flex flex-col items-center w-1/3 cursor-pointer"
+									onClick={() => onPlayerSelect?.(topThree[2].id)}
+								>
 									<div className="relative">
 										<div className="w-12 h-12 rounded-full border-2 border-amber-600 overflow-hidden bg-slate-800 flex items-center justify-center">
 											{topThree[2].avatar_url ? (
@@ -212,7 +213,8 @@ export const LeaderboardScreen: React.FC = () => {
 							return (
 								<div
 									key={player.id}
-									className="flex items-center justify-between p-3.5 hover:bg-slate-800/30 transition-colors"
+									className="flex items-center justify-between p-3.5 hover:bg-slate-800/30 transition-colors cursor-pointer"
+									onClick={() => onPlayerSelect?.(player.id)}
 								>
 									<div className="flex items-center gap-3 min-w-0">
 										<div className="flex items-center justify-center w-6">

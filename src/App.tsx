@@ -10,6 +10,7 @@ import { LeaderboardScreen } from './screen/LeaderboardScreen'
 import { MatchesScreen } from './screen/MatchesScreen'
 import { NewMatchScreen } from './screen/NewMatchScreen'
 import { ProfileScreen } from './screen/ProfileScreen'
+import { PlayerProfileScreen } from './screen/PlayerProfileScreen'
 
 // Icone
 import { Trophy, History, PlusCircle, User, Info } from 'lucide-react'
@@ -20,6 +21,7 @@ export const App: React.FC = () => {
 	const [activeTab, setActiveTab] = useState<'leaderboard' | 'matches' | 'new-match' | 'profile'>(
 		'leaderboard'
 	)
+	const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
 	const [pendingCount, setPendingCount] = useState(0)
 	const [hideBanner, setHideBanner] = useState(false)
 
@@ -76,9 +78,17 @@ export const App: React.FC = () => {
 	}
 
 	const renderContent = () => {
+		if (selectedPlayerId) {
+			return (
+				<PlayerProfileScreen
+					playerId={selectedPlayerId}
+					onBack={() => setSelectedPlayerId(null)}
+				/>
+			)
+		}
 		switch (activeTab) {
 			case 'leaderboard':
-				return <LeaderboardScreen />
+				return <LeaderboardScreen onPlayerSelect={id => setSelectedPlayerId(id)} />
 			case 'matches':
 				return <MatchesScreen />
 			case 'new-match':
@@ -86,7 +96,7 @@ export const App: React.FC = () => {
 			case 'profile':
 				return <ProfileScreen />
 			default:
-				return <LeaderboardScreen />
+				return <LeaderboardScreen onPlayerSelect={id => setSelectedPlayerId(id)} />
 		}
 	}
 
@@ -115,7 +125,10 @@ export const App: React.FC = () => {
 			<div className="absolute bottom-0 left-0 right-0 bg-neutral/95 backdrop-blur-md border-t border-slate-800/80 px-2 py-2 shrink-0 z-40">
 				<div className="grid grid-cols-4 items-center justify-around">
 					<button
-						onClick={() => setActiveTab('leaderboard')}
+						onClick={() => {
+							setSelectedPlayerId(null)
+							setActiveTab('leaderboard')
+						}}
 						className={`flex flex-col items-center justify-center py-1 transition-colors ${
 							activeTab === 'leaderboard'
 								? 'text-primary'
@@ -129,7 +142,10 @@ export const App: React.FC = () => {
 					</button>
 
 					<button
-						onClick={() => setActiveTab('matches')}
+						onClick={() => {
+							setSelectedPlayerId(null)
+							setActiveTab('matches')
+						}}
 						className={`flex flex-col items-center justify-center py-1 relative transition-colors ${
 							activeTab === 'matches'
 								? 'text-primary'
@@ -146,7 +162,10 @@ export const App: React.FC = () => {
 					</button>
 
 					<button
-						onClick={() => setActiveTab('new-match')}
+						onClick={() => {
+							setSelectedPlayerId(null)
+							setActiveTab('new-match')
+						}}
 						className={`flex flex-col items-center justify-center py-1 transition-colors ${
 							activeTab === 'new-match'
 								? 'text-primary'
@@ -160,7 +179,10 @@ export const App: React.FC = () => {
 					</button>
 
 					<button
-						onClick={() => setActiveTab('profile')}
+						onClick={() => {
+							setSelectedPlayerId(null)
+							setActiveTab('profile')
+						}}
 						className={`flex flex-col items-center justify-center py-1 transition-colors ${
 							activeTab === 'profile'
 								? 'text-primary'

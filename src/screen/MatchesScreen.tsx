@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { dbService, type MatchWithSets } from '../services/db'
 import { useAppStore } from '../store/useAppStore'
+import { useDataFetch } from '../hooks/useDataFetch'
+import { useModalState } from '../hooks/useModalState'
 import {
 	Calendar,
 	ShieldAlert,
@@ -23,11 +25,24 @@ interface CorrectionModal {
 export const MatchesScreen: React.FC = () => {
 	const { t } = useTranslation()
 	const { currentUser, refreshProfile } = useAppStore()
-	const [matches, setMatches] = useState<MatchWithSets[]>([])
-	const [isLoading, setIsLoading] = useState(true)
-	const [correctionModal, setCorrectionModal] = useState<CorrectionModal | null>(null)
-	const [correctionError, setCorrectionError] = useState<string | null>(null)
-	const [isSubmittingCorrection, setIsSubmittingCorrection] = useState(false)
+
+	const {
+		data,
+		isLoading,
+		refetch: fetchMatches,
+	} = useDataFetch(() => dbService.getMatches(), { refetchOnFocus: true })
+	const matches = data ?? []
+
+	const {
+		modalData: correctionModal,
+		modalError: correctionError,
+		isSubmitting: isSubmittingCorrection,
+		open: openCorrectionModal_,
+		close: closeCorrectionModal,
+		setModalData: setCorrectionModal,
+		setModalError: setCorrectionError,
+		setIsSubmitting: setIsSubmittingCorrection,
+	} = useModalState<CorrectionModal>()
 
 	const [searchQuery, setSearchQuery] = useState('')
 	const [scopeFilter, setScopeFilter] = useState<'all' | 'mine'>('all')
@@ -36,25 +51,6 @@ export const MatchesScreen: React.FC = () => {
 	const [formatFilter, setFormatFilter] = useState<'all' | '3' | '5'>('all')
 	const [showAdvanced, setShowAdvanced] = useState(false)
 	const [visibleLimit, setVisibleLimit] = useState(10)
-
-	const fetchMatches = async () => {
-		setIsLoading(true)
-		try {
-			const data = await dbService.getMatches()
-			setMatches(data)
-		} catch (err) {
-			console.error('Errore caricamento match:', err)
-		} finally {
-			setIsLoading(false)
-		}
-	}
-
-	useEffect(() => {
-		fetchMatches()
-		const handleFocus = () => fetchMatches()
-		window.addEventListener('focus', handleFocus)
-		return () => window.removeEventListener('focus', handleFocus)
-	}, [])
 
 	const handleConfirm = async (matchId: string) => {
 		try {
@@ -78,8 +74,7 @@ export const MatchesScreen: React.FC = () => {
 	}
 
 	const openCorrectionModal = (match: MatchWithSets) => {
-		setCorrectionError(null)
-		setCorrectionModal({
+		openCorrectionModal_({
 			match,
 			sets: match.sets.map(s => ({
 				score_p1: String(s.score_p1),
@@ -120,7 +115,7 @@ export const MatchesScreen: React.FC = () => {
 				score_p2: parseInt(correctionModal.sets[i].score_p2),
 			}))
 			await dbService.requestCorrection(correctionModal.match.id, newSets)
-			setCorrectionModal(null)
+			closeCorrectionModal()
 			await fetchMatches()
 		} catch (e) {
 			setCorrectionError((e as Error).message)
@@ -987,7 +982,7 @@ export const MatchesScreen: React.FC = () => {
 					className="fixed inset-0 z-50 flex items-center justify-center p-5"
 					style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}
 					onClick={e => {
-						if (e.target === e.currentTarget) setCorrectionModal(null)
+						if (e.target === e.currentTarget) closeCorrectionModal()
 					}}
 				>
 					<div className="w-full max-w-sm bg-slate-900 rounded-2xl shadow-2xl border border-slate-700 overflow-hidden">
@@ -1068,7 +1063,7 @@ export const MatchesScreen: React.FC = () => {
 						{/* Footer modale */}
 						<div className="px-6 pb-6 flex gap-3">
 							<button
-								onClick={() => setCorrectionModal(null)}
+								onClick={closeCorrectionModal}
 								disabled={isSubmittingCorrection}
 								className="btn btn-ghost flex-1 border border-slate-700 text-slate-300 hover:bg-slate-800 hover:border-slate-600"
 							>

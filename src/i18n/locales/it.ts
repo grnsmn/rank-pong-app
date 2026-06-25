@@ -175,6 +175,16 @@ const it = {
 		errorSamePlayers: 'I due giocatori devono essere diversi',
 		vsLabel: 'vs',
 	},
+	playerProfile: {
+		title: 'Profilo Giocatore',
+		subtitle: 'Statistiche pubbliche del giocatore',
+		backButton: 'Indietro',
+		noStats: 'Nessuna statistica disponibile',
+		recentMatches: 'Partite Recenti',
+		vsLabel: 'vs',
+		matchWon: 'Vinta',
+		matchLost: 'Persa',
+	},
 	profile: {
 		title: 'Il Mio Profilo',
 		subtitle: 'Le tue statistiche atletiche e di ranking',

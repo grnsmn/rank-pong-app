@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { dbService, type Profile } from '../services/db'
 import { useAppStore } from '../store/useAppStore'
+import { useDataFetch } from '../hooks/useDataFetch'
+import { useFormState } from '../hooks/useFormState'
+import { useClickOutside } from '../hooks/useClickOutside'
 import { AlertTriangle, CheckCircle2, Check, Scale } from 'lucide-react'
 
 interface SetInput {
@@ -12,7 +15,22 @@ interface SetInput {
 export const NewMatchScreen: React.FC = () => {
 	const { t } = useTranslation()
 	const { currentUser } = useAppStore()
-	const [profiles, setProfiles] = useState<Profile[]>([])
+
+	const { data } = useDataFetch<Profile[]>(
+		() => dbService.getProfiles().then(ps => ps.filter(p => p.id !== currentUser?.id)),
+		{ deps: [currentUser?.id] }
+	)
+	const profiles = data ?? []
+
+	const {
+		isSaving: isLoading,
+		formError: errorMsg,
+		successMsg,
+		setFormError: setErrorMsg,
+		setIsSaving: setIsLoading,
+		setSuccessMsg,
+	} = useFormState()
+
 	const [isArbitratorMode, setIsArbitratorMode] = useState(false)
 	const [player1Id, setPlayer1Id] = useState('')
 	const [player1Search, setPlayer1Search] = useState('')
@@ -23,24 +41,10 @@ export const NewMatchScreen: React.FC = () => {
 	const [showOpponentDropdown, setShowOpponentDropdown] = useState(false)
 	const opponentRef = useRef<HTMLDivElement>(null)
 	const [bestOf, setBestOf] = useState<3 | 5>(3)
-
 	const [sets, setSets] = useState<SetInput[]>([{ score1: '', score2: '' }])
 
-	const [isLoading, setIsLoading] = useState(false)
-	const [errorMsg, setErrorMsg] = useState<string | null>(null)
-	const [successMsg, setSuccessMsg] = useState<string | null>(null)
-
-	useEffect(() => {
-		const fetchProfiles = async () => {
-			try {
-				const data = await dbService.getProfiles()
-				setProfiles(data.filter(p => p.id !== currentUser?.id))
-			} catch (err) {
-				console.error('Errore caricamento profili:', err)
-			}
-		}
-		fetchProfiles()
-	}, [currentUser])
+	useClickOutside(player1Ref, () => setShowPlayer1Dropdown(false))
+	useClickOutside(opponentRef, () => setShowOpponentDropdown(false))
 
 	const validateSet = (
 		score1: number,
@@ -251,19 +255,6 @@ export const NewMatchScreen: React.FC = () => {
 		const q = player1Search.toLowerCase()
 		return p.display_name.toLowerCase().includes(q) || p.username.toLowerCase().includes(q)
 	})
-
-	useEffect(() => {
-		const handleClickOutside = (e: MouseEvent) => {
-			if (opponentRef.current && !opponentRef.current.contains(e.target as Node)) {
-				setShowOpponentDropdown(false)
-			}
-			if (player1Ref.current && !player1Ref.current.contains(e.target as Node)) {
-				setShowPlayer1Dropdown(false)
-			}
-		}
-		document.addEventListener('mousedown', handleClickOutside)
-		return () => document.removeEventListener('mousedown', handleClickOutside)
-	}, [])
 
 	return (
 		<div className="flex flex-col h-full bg-base-100 text-white">

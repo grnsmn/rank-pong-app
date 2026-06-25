@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store/useAppStore'
+import { useFormState } from '../hooks/useFormState'
 
 export const LoginScreen: React.FC = () => {
 	const { t } = useTranslation()
@@ -15,13 +16,17 @@ export const LoginScreen: React.FC = () => {
 	const [age, setAge] = useState<number>(25)
 	const [playerType, setPlayerType] = useState<'amateur' | 'competitive' | 'student'>('amateur')
 
-	const [localError, setLocalError] = useState<string | null>(null)
-	const [successMsg, setSuccessMsg] = useState<string | null>(null)
+	const {
+		formError: localError,
+		successMsg,
+		setFormError: setLocalError,
+		setSuccessMsg,
+		clearMessages,
+	} = useFormState()
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
-		setLocalError(null)
-		setSuccessMsg(null)
+		clearMessages()
 
 		if (!email || !password) {
 			setLocalError(t('login.errorFillAll'))
@@ -223,8 +228,7 @@ export const LoginScreen: React.FC = () => {
 				<button
 					onClick={() => {
 						setIsSignup(!isSignup)
-						setLocalError(null)
-						setSuccessMsg(null)
+						clearMessages()
 					}}
 					className={`btn btn-sm w-full font-semibold ${isSignup ? 'btn-ghost text-slate-300 hover:text-white' : 'btn-secondary text-white'}`}
 				>
