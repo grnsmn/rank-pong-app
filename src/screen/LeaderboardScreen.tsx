@@ -80,11 +80,13 @@ export const LeaderboardScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 
 			<div className="px-4 py-2">
 				<div className="relative">
-					<Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+					<span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500 pointer-events-none">
+						<Search className="w-3.5 h-3.5" />
+					</span>
 					<input
 						type="text"
 						placeholder={t('leaderboard.searchPlaceholder')}
-						className="input input-bordered input-sm w-full pl-9 bg-slate-800 text-white focus:input-primary"
+						className="input input-sm pl-8.5 w-full bg-slate-950 border-slate-850 text-white rounded-xl focus:border-primary focus:outline-none placeholder-slate-500 text-xs h-8"
 						value={search}
 						onChange={e => setSearch(e.target.value)}
 					/>
@@ -102,7 +104,7 @@ export const LeaderboardScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 			) : (
 				<div className="flex-1 overflow-y-auto px-4 pb-24 space-y-4">
 					{search === '' && topThree.length > 0 && (
-						<div className="flex justify-center items-end gap-2 pt-6 pb-4 bg-slate-900/40 rounded-2xl border border-slate-800 px-2">
+						<div className="flex justify-center items-end gap-2 pt-10 pb-4 bg-slate-900/40 rounded-2xl border border-slate-800 px-2">
 							{topThree[1] && (
 								<div
 									className="flex flex-col items-center w-1/3 cursor-pointer"
@@ -166,7 +168,7 @@ export const LeaderboardScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 									<span className="text-[10px] text-slate-300 truncate max-w-full">
 										@{topThree[0].username}
 									</span>
-									<div className="badge badge-warning mt-1 text-slate-900 font-extrabold text-xs px-2 py-0.5">
+									<div className="badge badge-neutral mt-1 text-yellow-400 font-extrabold text-xs px-2 py-0.5">
 										{topThree[0].elo_rating}
 									</div>
 								</div>
