@@ -436,3 +436,189 @@ begin
   end if;
 end;
 $$;
+
+
+-- ============================================================
+-- 7. K-FACTOR PER TIPO GIOCATORE
+--    Studente K=48 (rating in evoluzione rapida)
+--    Amatore  K=32 (standard)
+--    Agonista K=24 (rating consolidato e stabile)
+-- ============================================================
+
+create or replace function public.k_for_type(ptype text)
+returns integer
+language plpgsql
+immutable
+as $$
+begin
+  if ptype = 'competitive' then return 24;
+  elsif ptype = 'student'     then return 48;
+  else                             return 32;
+  end if;
+end;
+$$;
+
+-- Aggiorna il trigger di conferma match per usare K per tipo giocatore
+create or replace function public.calculate_elo_on_confirm()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  p1_rating   integer;
+  p2_rating   integer;
+  p1_type     text;
+  p2_type     text;
+  sets_p1     integer;
+  sets_p2     integer;
+  e_a         float;
+  e_b         float;
+  change_a    integer;
+  change_b    integer;
+  k_a         integer;
+  k_b         integer;
+begin
+  if new.status = 'confirmed' and old.status <> 'confirmed' then
+
+    select elo_rating, player_type into p1_rating, p1_type
+      from public.profiles where id = new.player_1_id;
+    select elo_rating, player_type into p2_rating, p2_type
+      from public.profiles where id = new.player_2_id;
+
+    k_a := public.k_for_type(p1_type);
+    k_b := public.k_for_type(p2_type);
+
+    select
+      count(*) filter (where score_p1 > score_p2),
+      count(*) filter (where score_p2 > score_p1)
+    into sets_p1, sets_p2
+    from public.sets
+    where match_id = new.id;
+
+    e_a := 1.0 / (1.0 + power(10.0, (p2_rating - p1_rating)::float / 400.0));
+    e_b := 1.0 / (1.0 + power(10.0, (p1_rating - p2_rating)::float / 400.0));
+
+    if sets_p1 > sets_p2 then
+      change_a := round(k_a * (1.0 - e_a));
+      change_b := round(k_b * (0.0 - e_b));
+    else
+      change_a := round(k_a * (0.0 - e_a));
+      change_b := round(k_b * (1.0 - e_b));
+    end if;
+
+    new.elo_change_p1 := change_a;
+    new.elo_change_p2 := change_b;
+
+    update public.profiles
+      set elo_rating = greatest(0, elo_rating + change_a)
+      where id = new.player_1_id;
+
+    update public.profiles
+      set elo_rating = greatest(0, elo_rating + change_b)
+      where id = new.player_2_id;
+
+  end if;
+
+  return new;
+end;
+$$;
+
+-- Aggiorna approve_correction per usare K per tipo giocatore
+create or replace function public.approve_correction(match_id_param uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  m          record;
+  p1_rating  integer;
+  p2_rating  integer;
+  p1_type    text;
+  p2_type    text;
+  set_item   jsonb;
+  sets_p1    integer;
+  sets_p2    integer;
+  e_a        float;
+  e_b        float;
+  change_a   integer;
+  change_b   integer;
+  k_a        integer;
+  k_b        integer;
+begin
+  select * into m from public.matches where id = match_id_param;
+
+  if m.correction_status <> 'pending' then
+    raise exception 'Nessuna correzione in attesa';
+  end if;
+
+  if m.correction_requested_by = (select auth.uid()) then
+    raise exception 'Non puoi approvare la tua stessa richiesta';
+  end if;
+
+  if (select auth.uid()) <> m.player_1_id and (select auth.uid()) <> m.player_2_id then
+    raise exception 'Non sei un giocatore di questo match';
+  end if;
+
+  select player_type into p1_type from public.profiles where id = m.player_1_id;
+  select player_type into p2_type from public.profiles where id = m.player_2_id;
+
+  k_a := public.k_for_type(p1_type);
+  k_b := public.k_for_type(p2_type);
+
+  update public.profiles
+    set elo_rating = greatest(0, elo_rating - m.elo_change_p1)
+    where id = m.player_1_id;
+
+  update public.profiles
+    set elo_rating = greatest(0, elo_rating - m.elo_change_p2)
+    where id = m.player_2_id;
+
+  for set_item in select * from jsonb_array_elements(m.correction_sets)
+  loop
+    update public.sets
+      set score_p1 = (set_item->>'score_p1')::integer,
+          score_p2 = (set_item->>'score_p2')::integer
+      where match_id = match_id_param
+        and set_number = (set_item->>'set_number')::integer;
+  end loop;
+
+  select
+    count(*) filter (where score_p1 > score_p2),
+    count(*) filter (where score_p2 > score_p1)
+  into sets_p1, sets_p2
+  from public.sets
+  where match_id = match_id_param;
+
+  select elo_rating into p1_rating from public.profiles where id = m.player_1_id;
+  select elo_rating into p2_rating from public.profiles where id = m.player_2_id;
+
+  e_a := 1.0 / (1.0 + power(10.0, (p2_rating - p1_rating)::float / 400.0));
+  e_b := 1.0 / (1.0 + power(10.0, (p1_rating - p2_rating)::float / 400.0));
+
+  if sets_p1 > sets_p2 then
+    change_a := round(k_a * (1.0 - e_a));
+    change_b := round(k_b * (0.0 - e_b));
+  else
+    change_a := round(k_a * (0.0 - e_a));
+    change_b := round(k_b * (1.0 - e_b));
+  end if;
+
+  update public.profiles
+    set elo_rating = greatest(0, elo_rating + change_a)
+    where id = m.player_1_id;
+
+  update public.profiles
+    set elo_rating = greatest(0, elo_rating + change_b)
+    where id = m.player_2_id;
+
+  update public.matches
+    set elo_change_p1           = change_a,
+        elo_change_p2           = change_b,
+        correction_status       = 'approved',
+        correction_requested_by = null,
+        correction_sets         = null
+    where id = match_id_param;
+end;
+$$;

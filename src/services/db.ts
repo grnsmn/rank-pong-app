@@ -129,21 +129,32 @@ function initializeMockData() {
 initializeMockData()
 
 // Utility per calcolare Elo in TS (replica della logica SQL per la demo offline/mock)
+
+function kForType(type: string): number {
+	if (type === 'competitive') return 24
+	if (type === 'student') return 48
+	return 32
+}
+
 export function calculateEloTS(
 	rA: number,
 	rB: number,
 	setsA: number,
 	setsB: number,
-	k: number = 32
+	typeA: string = 'amateur',
+	typeB: string = 'amateur'
 ) {
+	const kA = kForType(typeA)
+	const kB = kForType(typeB)
+
 	const sA = setsA > setsB ? 1.0 : 0.0
 	const sB = setsA > setsB ? 0.0 : 1.0
 
 	const eA = 1.0 / (1.0 + Math.pow(10.0, (rB - rA) / 400.0))
 	const eB = 1.0 / (1.0 + Math.pow(10.0, (rA - rB) / 400.0))
 
-	const changeA = Math.round(k * (sA - eA))
-	const changeB = Math.round(k * (sB - eB))
+	const changeA = Math.round(kA * (sA - eA))
+	const changeB = Math.round(kB * (sB - eB))
 
 	return { changeA, changeB }
 }
@@ -521,7 +532,9 @@ export const dbService = {
 				profile1.elo_rating,
 				profile2.elo_rating,
 				setsWonP1,
-				setsWonP2
+				setsWonP2,
+				profile1.player_type,
+				profile2.player_type
 			)
 
 			// Aggiorna profili
@@ -585,7 +598,9 @@ export const dbService = {
 					profile1.elo_rating,
 					profile2.elo_rating,
 					setsWonP1,
-					setsWonP2
+					setsWonP2,
+					profile1.player_type,
+					profile2.player_type
 				)
 
 				profile1.elo_rating = Math.max(0, profile1.elo_rating + changeA)
@@ -724,7 +739,9 @@ export const dbService = {
 				profile1.elo_rating,
 				profile2.elo_rating,
 				setsP1,
-				setsP2
+				setsP2,
+				profile1.player_type,
+				profile2.player_type
 			)
 
 			profile1.elo_rating = Math.max(0, profile1.elo_rating + changeA)

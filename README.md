@@ -6,7 +6,7 @@ ELO ranking system for amateur ping pong tournaments. Track matches set by set, 
 
 ## Features
 
-- **ELO Rating** — calculated automatically after each confirmed match; rewards victories against stronger opponents
+- **ELO Rating** — calculated automatically after each confirmed match; rewards victories against stronger opponents. The K-factor varies by player type: Competitive K=24 (stable rating), Amateur K=32 (standard), Student K=48 (fast-developing rating)
 - **Set by set match** — record scores with real-time validation (minimum 11 points, margin of 2)
 - **Referee mode** — record a match between two other players without being one of the contenders
 - **Score correction** — request a score correction; the opponent approves or rejects and the ELO is recalculated atomically
@@ -28,6 +28,27 @@ ELO ranking system for amateur ping pong tournaments. Track matches set by set, 
 | Global State | Zustand                                   |
 | i18n         | react-i18next (Italian)                   |
 | Deploy       | Netlify (SPA redirect via `netlify.toml`) |
+
+---
+
+## How it works — ELO calculation
+
+The rating system uses the standard Elo formula with a **variable K-factor based on player type**:
+
+| Player type | K-factor | Effect                                             |
+| ----------- | -------- | -------------------------------------------------- |
+| Student     | 48       | Rating adjusts rapidly — reaches true level faster |
+| Amateur     | 32       | Standard, balanced                                 |
+| Competitive | 24       | Stable rating — harder to gain or lose points      |
+
+Each player uses their own K independently. Beating a Competitive player as an Amateur yields more points than the opponent loses — by design, as the upset carries more weight.
+
+```
+ELO change = K × (actual score − expected win probability)
+
+Expected probability = 1 / (1 + 10^((opponent_rating − your_rating) / 400))
+Actual score: 1.0 if won, 0.0 if lost
+```
 
 ---
 
