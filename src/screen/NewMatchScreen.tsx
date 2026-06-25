@@ -16,9 +16,8 @@ export const NewMatchScreen: React.FC = () => {
 	const { t } = useTranslation()
 	const { currentUser } = useAppStore()
 
-	const { data } = useDataFetch<Profile[]>(
-		() => dbService.getProfiles().then(ps => ps.filter(p => p.id !== currentUser?.id)),
-		{ deps: [currentUser?.id] }
+	const { data } = useDataFetch<Profile[]>(() =>
+		dbService.getProfiles().then(ps => ps.filter(p => p.id !== currentUser?.id))
 	)
 	const profiles = data ?? []
 
@@ -306,7 +305,7 @@ export const NewMatchScreen: React.FC = () => {
 							<div ref={player1Ref} className="relative mt-1">
 								<input
 									type="text"
-									className="input input-bordered input-sm w-full bg-slate-800 text-white focus:input-primary pr-8"
+									className="input input-sm w-full bg-slate-950 border-slate-800 text-white rounded-xl focus:border-primary focus:outline-none placeholder-slate-500 text-xs h-8 pl-3"
 									placeholder={
 										selectedPlayer1
 											? `${selectedPlayer1.display_name} (@${selectedPlayer1.username}) — ${selectedPlayer1.elo_rating} ${t('common.elo')}`
@@ -367,7 +366,7 @@ export const NewMatchScreen: React.FC = () => {
 						<div ref={opponentRef} className="relative mt-1">
 							<input
 								type="text"
-								className="input input-bordered input-sm w-full bg-slate-800 text-white focus:input-primary pr-8"
+								className="input input-sm w-full bg-slate-950 border-slate-800 text-white rounded-xl focus:border-primary focus:outline-none placeholder-slate-500 text-xs h-8 pl-3"
 								placeholder={
 									selectedOpponent
 										? `${selectedOpponent.display_name} (@${selectedOpponent.username}) — ${selectedOpponent.elo_rating} ${t('common.elo')}`
@@ -493,7 +492,7 @@ export const NewMatchScreen: React.FC = () => {
 															)[0] ?? 'P1')
 														: t('common.you')
 												}
-												className="input input-bordered input-sm w-full bg-slate-800 text-center font-bold text-white text-sm focus:input-primary"
+												className="input input-sm w-full bg-slate-950 border-slate-800 text-white rounded-xl focus:border-primary focus:outline-none text-center font-bold text-sm h-8"
 												value={set.score1}
 												onChange={e =>
 													handleSetChange(index, 1, e.target.value)
@@ -515,7 +514,7 @@ export const NewMatchScreen: React.FC = () => {
 															)[0] ?? 'P2')
 														: t('common.opponent')
 												}
-												className="input input-bordered input-sm w-full bg-slate-800 text-center font-bold text-white text-sm focus:input-primary"
+												className="input input-sm w-full bg-slate-950 border-slate-800 text-white rounded-xl focus:border-primary focus:outline-none text-center font-bold text-sm h-8"
 												value={set.score2}
 												onChange={e =>
 													handleSetChange(index, 2, e.target.value)
@@ -649,7 +648,11 @@ export const NewMatchScreen: React.FC = () => {
 					<button
 						type="submit"
 						disabled={!status.canSubmit || isLoading}
-						className={`btn btn-primary w-full text-white font-bold uppercase tracking-wider ${isLoading ? 'loading' : ''}`}
+						className={`btn w-full font-bold uppercase tracking-wider rounded-xl border-none text-white ${
+							status.canSubmit && !isLoading
+								? 'bg-orange-500 hover:bg-orange-400'
+								: 'bg-slate-700 text-slate-500 cursor-not-allowed'
+						} ${isLoading ? 'loading' : ''}`}
 					>
 						{t('newMatch.submitButton')}
 					</button>
