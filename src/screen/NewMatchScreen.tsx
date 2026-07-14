@@ -5,12 +5,24 @@ import { useAppStore } from '../store/useAppStore'
 import { useDataFetch } from '../hooks/useDataFetch'
 import { useFormState } from '../hooks/useFormState'
 import { useClickOutside } from '../hooks/useClickOutside'
+import { useSessionState } from '../hooks/useSessionState'
 import { AlertTriangle, CheckCircle2, Check, Scale } from 'lucide-react'
 
 interface SetInput {
 	score1: string
 	score2: string
 }
+
+// Chiavi sessionStorage per persistere il form durante la sessione
+const SS = {
+	arbitrator: 'newMatch.isArbitratorMode',
+	player1Id: 'newMatch.player1Id',
+	player1Search: 'newMatch.player1Search',
+	opponentId: 'newMatch.opponentId',
+	opponentSearch: 'newMatch.opponentSearch',
+	bestOf: 'newMatch.bestOf',
+	sets: 'newMatch.sets',
+} as const
 
 export const NewMatchScreen: React.FC = () => {
 	const { t } = useTranslation()
@@ -30,17 +42,17 @@ export const NewMatchScreen: React.FC = () => {
 		setSuccessMsg,
 	} = useFormState()
 
-	const [isArbitratorMode, setIsArbitratorMode] = useState(false)
-	const [player1Id, setPlayer1Id] = useState('')
-	const [player1Search, setPlayer1Search] = useState('')
+	const [isArbitratorMode, setIsArbitratorMode] = useSessionState(SS.arbitrator, false)
+	const [player1Id, setPlayer1Id] = useSessionState(SS.player1Id, '')
+	const [player1Search, setPlayer1Search] = useSessionState(SS.player1Search, '')
 	const [showPlayer1Dropdown, setShowPlayer1Dropdown] = useState(false)
 	const player1Ref = useRef<HTMLDivElement>(null)
-	const [opponentId, setOpponentId] = useState('')
-	const [opponentSearch, setOpponentSearch] = useState('')
+	const [opponentId, setOpponentId] = useSessionState(SS.opponentId, '')
+	const [opponentSearch, setOpponentSearch] = useSessionState(SS.opponentSearch, '')
 	const [showOpponentDropdown, setShowOpponentDropdown] = useState(false)
 	const opponentRef = useRef<HTMLDivElement>(null)
-	const [bestOf, setBestOf] = useState<3 | 5>(3)
-	const [sets, setSets] = useState<SetInput[]>([{ score1: '', score2: '' }])
+	const [bestOf, setBestOf] = useSessionState<3 | 5>(SS.bestOf, 3)
+	const [sets, setSets] = useSessionState<SetInput[]>(SS.sets, [{ score1: '', score2: '' }])
 
 	useClickOutside(player1Ref, () => setShowPlayer1Dropdown(false))
 	useClickOutside(opponentRef, () => setShowOpponentDropdown(false))
