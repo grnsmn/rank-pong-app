@@ -5,8 +5,9 @@ import { useFormState } from '../hooks/useFormState'
 
 export const LoginScreen: React.FC = () => {
 	const { t } = useTranslation()
-	const { login, signup, error } = useAppStore()
+	const { login, signup, requestPasswordReset, error } = useAppStore()
 	const [isSignup, setIsSignup] = useState(false)
+	const [isForgot, setIsForgot] = useState(false)
 	const [email, setEmail] = useState('')
 	const [password, setPassword] = useState('')
 
@@ -27,6 +28,21 @@ export const LoginScreen: React.FC = () => {
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
 		clearMessages()
+
+		// Recupero password: serve solo l'email
+		if (isForgot) {
+			if (!email) {
+				setLocalError(t('login.errorFillAll'))
+				return
+			}
+			try {
+				await requestPasswordReset(email)
+				setSuccessMsg(t('login.forgotSuccess'))
+			} catch (err: any) {
+				setLocalError(err.message || t('login.errorGeneric'))
+			}
+			return
+		}
 
 		if (!email || !password) {
 			setLocalError(t('login.errorFillAll'))
@@ -63,7 +79,11 @@ export const LoginScreen: React.FC = () => {
 					</div>
 					<h1 className="text-2xl font-bold tracking-tight text-white mb-1">RankPong</h1>
 					<p className="text-xs text-slate-400">
-						{isSignup ? t('login.titleRegister') : t('login.titleLogin')}
+						{isForgot
+							? t('login.forgotSubtitle')
+							: isSignup
+								? t('login.titleRegister')
+								: t('login.titleLogin')}
 					</p>
 				</div>
 
@@ -124,23 +144,38 @@ export const LoginScreen: React.FC = () => {
 						/>
 					</div>
 
-					<div className="form-control">
-						<label className="label py-1">
-							<span className="label-text text-xs text-slate-300 font-medium">
-								{t('login.passwordLabel')}
-							</span>
-						</label>
-						<input
-							type="password"
-							placeholder={t('login.passwordPlaceholder')}
-							className="input input-bordered input-sm w-full bg-slate-800 text-white focus:input-primary"
-							value={password}
-							onChange={e => setPassword(e.target.value)}
-							required
-						/>
-					</div>
+					{!isForgot && (
+						<div className="form-control">
+							<label className="label py-1">
+								<span className="label-text text-xs text-slate-300 font-medium">
+									{t('login.passwordLabel')}
+								</span>
+							</label>
+							<input
+								type="password"
+								placeholder={t('login.passwordPlaceholder')}
+								className="input input-bordered input-sm w-full bg-slate-800 text-white focus:input-primary"
+								value={password}
+								onChange={e => setPassword(e.target.value)}
+								required={!isForgot}
+							/>
+							{!isSignup && (
+								<button
+									type="button"
+									onClick={() => {
+										setIsForgot(true)
+										setIsSignup(false)
+										clearMessages()
+									}}
+									className="text-xs text-orange-400 hover:text-orange-300 hover:underline mt-1.5 self-end"
+								>
+									{t('login.forgotPassword')}
+								</button>
+							)}
+						</div>
+					)}
 
-					{isSignup && (
+					{isSignup && !isForgot && (
 						<>
 							<div className="form-control">
 								<label className="label py-1">
@@ -218,22 +253,38 @@ export const LoginScreen: React.FC = () => {
 						type="submit"
 						className="btn btn-primary btn-sm w-full mt-6 text-white font-bold uppercase tracking-wider"
 					>
-						{isSignup ? t('login.registerButton') : t('login.loginButton')}
+						{isForgot
+							? t('login.forgotButton')
+							: isSignup
+								? t('login.registerButton')
+								: t('login.loginButton')}
 					</button>
 				</form>
 
-				{/* Pulsante Switch Login/Signup */}
+				{/* Pulsante Switch Login/Signup/Forgot */}
 				<div className="divider text-xs text-slate-500 my-4">{t('login.or')}</div>
 
-				<button
-					onClick={() => {
-						setIsSignup(!isSignup)
-						clearMessages()
-					}}
-					className={`btn btn-sm w-full font-semibold ${isSignup ? 'btn-ghost text-slate-300 hover:text-white' : 'btn-secondary text-white'}`}
-				>
-					{isSignup ? t('login.hasAccount') : t('login.noAccount')}
-				</button>
+				{isForgot ? (
+					<button
+						onClick={() => {
+							setIsForgot(false)
+							clearMessages()
+						}}
+						className="btn btn-sm w-full font-semibold btn-ghost text-slate-300 hover:text-white"
+					>
+						{t('login.backToLogin')}
+					</button>
+				) : (
+					<button
+						onClick={() => {
+							setIsSignup(!isSignup)
+							clearMessages()
+						}}
+						className={`btn btn-sm w-full font-semibold ${isSignup ? 'btn-ghost text-slate-300 hover:text-white' : 'btn-secondary text-white'}`}
+					>
+						{isSignup ? t('login.hasAccount') : t('login.noAccount')}
+					</button>
+				)}
 			</div>
 		</div>
 	)

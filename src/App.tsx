@@ -6,6 +6,7 @@ import { dbService } from './services/db'
 
 // Schermate
 import { LoginScreen } from './screen/LoginScreen'
+import { ResetPasswordScreen } from './screen/ResetPasswordScreen'
 import { LeaderboardScreen } from './screen/LeaderboardScreen'
 import { MatchesScreen } from './screen/MatchesScreen'
 import { NewMatchScreen } from './screen/NewMatchScreen'
@@ -17,7 +18,7 @@ import { Trophy, History, PlusCircle, User, Info } from 'lucide-react'
 
 export const App: React.FC = () => {
 	const { t } = useTranslation()
-	const { currentUser, initialize, isLoading } = useAppStore()
+	const { currentUser, initialize, isLoading, recoveryMode } = useAppStore()
 	const [activeTab, setActiveTab] = useState<'leaderboard' | 'matches' | 'new-match' | 'profile'>(
 		'leaderboard'
 	)
@@ -71,6 +72,12 @@ export const App: React.FC = () => {
 				</h2>
 			</div>
 		)
+	}
+
+	// L'utente è arrivato tramite link di reset password: mostra la schermata
+	// per impostare la nuova password (ha priorità su login e app).
+	if (recoveryMode) {
+		return <ResetPasswordScreen />
 	}
 
 	if (!currentUser) {

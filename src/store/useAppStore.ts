@@ -1,11 +1,16 @@
 import { create } from 'zustand'
 import { dbService, type Profile } from '../services/db'
+import { supabase, isSupabaseConfigured } from '../supabaseClient'
+
+// Evita di registrare più volte il listener di auth
+let authListenerRegistered = false
 
 interface AppState {
 	currentUser: { id: string; email: string; username: string; display_name: string } | null
 	currentProfile: Profile | null
 	isLoading: boolean
 	error: string | null
+	recoveryMode: boolean
 	initialize: () => Promise<void>
 	login: (email: string, password: string) => Promise<void>
 	signup: (
@@ -23,6 +28,9 @@ interface AppState {
 		age?: number | null
 		player_type?: 'amateur' | 'competitive' | 'student'
 	}) => Promise<void>
+	requestPasswordReset: (email: string) => Promise<void>
+	updatePassword: (newPassword: string) => Promise<void>
+	setRecoveryMode: (value: boolean) => void
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -30,9 +38,26 @@ export const useAppStore = create<AppState>((set, get) => ({
 	currentProfile: null,
 	isLoading: true,
 	error: null,
+	recoveryMode: false,
 
 	initialize: async () => {
 		set({ isLoading: true, error: null })
+
+		// Registra una sola volta il listener che intercetta il click sul link
+		// di reset password ricevuto via email (evento PASSWORD_RECOVERY).
+		if (isSupabaseConfigured && supabase && !authListenerRegistered) {
+			authListenerRegistered = true
+			supabase.auth.onAuthStateChange(event => {
+				if (event === 'PASSWORD_RECOVERY') {
+					// Pulisce il fragment dall'URL per evitare ri-trigger e link condivisibili
+					if (window.history.replaceState) {
+						window.history.replaceState(null, '', window.location.pathname)
+					}
+					set({ recoveryMode: true, isLoading: false })
+				}
+			})
+		}
+
 		try {
 			const user = await dbService.getCurrentUser()
 			if (user) {
@@ -133,4 +158,35 @@ export const useAppStore = create<AppState>((set, get) => ({
 			},
 		})
 	},
+
+	requestPasswordReset: async email => {
+		set({ error: null })
+		try {
+			await dbService.requestPasswordReset(email)
+		} catch (err: any) {
+			set({ error: err.message || 'Impossibile inviare il link di reset' })
+			throw err
+		}
+	},
+
+	updatePassword: async newPassword => {
+		set({ isLoading: true, error: null })
+		try {
+			await dbService.updatePassword(newPassword)
+			// La sessione di recovery è ora una sessione valida: carichiamo il profilo
+			const user = await dbService.getCurrentUser()
+			if (user) {
+				const profile = await dbService.getProfile(user.id)
+				set({ currentUser: user, currentProfile: profile })
+			}
+			set({ recoveryMode: false })
+		} catch (err: any) {
+			set({ error: err.message || 'Impossibile aggiornare la password' })
+			throw err
+		} finally {
+			set({ isLoading: false })
+		}
+	},
+
+	setRecoveryMode: value => set({ recoveryMode: value }),
 }))

@@ -313,6 +313,30 @@ export const dbService = {
 		localStorage.removeItem('rp_session')
 	},
 
+	async requestPasswordReset(email: string): Promise<void> {
+		if (isSupabaseConfigured && supabase) {
+			// Il link di reset riporta l'utente alla SPA: detectSessionInUrl
+			// gestisce il fragment e fa scattare l'evento PASSWORD_RECOVERY
+			const { error } = await supabase.auth.resetPasswordForEmail(email, {
+				redirectTo: window.location.origin,
+			})
+			if (error) throw new Error(error.message)
+		} else {
+			// Mock: nessun invio email possibile in modalità demo
+			throw new Error('Il recupero password non è disponibile in modalità demo')
+		}
+	},
+
+	async updatePassword(newPassword: string): Promise<void> {
+		if (isSupabaseConfigured && supabase) {
+			// Richiede una sessione attiva (creata dal link di recovery)
+			const { error } = await supabase.auth.updateUser({ password: newPassword })
+			if (error) throw new Error(error.message)
+		} else {
+			throw new Error('Il recupero password non è disponibile in modalità demo')
+		}
+	},
+
 	// --- PROFILES SERVICES ---
 	async getProfiles(): Promise<Profile[]> {
 		if (isSupabaseConfigured && supabase) {
