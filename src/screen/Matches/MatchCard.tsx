@@ -195,10 +195,12 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 					) : canRequestCorrection(match, currentUserId) ? (
 						<button
 							onClick={() => onRequestCorrection(match)}
-							className="w-full flex items-center justify-center gap-1.5 text-[11px] text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+							className="w-full flex items-center justify-center cursor-pointer group"
 						>
-							<Pencil className="w-3 h-3" />
-							{t('matches.correctionRequestButton')}
+							<span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-950/60 text-slate-300 text-[11px] font-semibold group-hover:bg-slate-950 group-hover:text-white transition-colors">
+								<Pencil className="w-3 h-3" />
+								{t('matches.correctionRequestButton')}
+							</span>
 						</button>
 					) : null}
 				</div>

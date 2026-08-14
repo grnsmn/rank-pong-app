@@ -111,7 +111,7 @@ const it = {
 		correctionReject: 'Rifiuta',
 		correctionSentWaiting: 'Correzione inviata, in attesa di risposta',
 		correctionOpponentPending: "L'avversario ha richiesto una correzione",
-		correctionRequestButton: 'Richiedi correzione punteggi',
+		correctionRequestButton: 'Correggi punteggio',
 		correctionModalTitle: 'Richiedi correzione',
 		correctionModalSubtitle:
 			'Inserisci i punteggi corretti. Il tuo avversario dovrà approvare la modifica prima che i risultati vengano aggiornati.',
