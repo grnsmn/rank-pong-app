@@ -15,6 +15,7 @@ import {
 	SlidersHorizontal,
 	X,
 	Trophy,
+	Handshake,
 } from 'lucide-react'
 
 interface CorrectionModal {
@@ -47,6 +48,7 @@ export const MatchesScreen: React.FC = () => {
 	const [searchQuery, setSearchQuery] = useState('')
 	const [scopeFilter, setScopeFilter] = useState<'all' | 'mine'>('all')
 	const [outcomeFilter, setOutcomeFilter] = useState<'all' | 'wins' | 'losses'>('all')
+	const [typeFilter, setTypeFilter] = useState<'all' | 'ranked' | 'friendly'>('all')
 	const [timeFilter, setTimeFilter] = useState<'all' | 'week' | 'month' | 'threeMonths'>('all')
 	const [formatFilter, setFormatFilter] = useState<'all' | '3' | '5'>('all')
 	const [showAdvanced, setShowAdvanced] = useState(false)
@@ -226,6 +228,10 @@ export const MatchesScreen: React.FC = () => {
 			if (match.best_of !== formatVal) return false
 		}
 
+		// 6. Match Type Filter (Ranked vs Amichevole)
+		if (typeFilter === 'ranked' && match.is_friendly) return false
+		if (typeFilter === 'friendly' && !match.is_friendly) return false
+
 		return true
 	})
 
@@ -402,6 +408,12 @@ export const MatchesScreen: React.FC = () => {
 															{t('matches.arbitratorBadge')}
 														</span>
 													)}
+													{match.is_friendly && (
+														<span className="badge badge-sm font-extrabold text-[10px] bg-sky-600 text-white border-none gap-1">
+															<Handshake className="w-2.5 h-2.5" />
+															{t('matches.friendlyBadge')}
+														</span>
+													)}
 												</div>
 												<span className="text-[10px] text-slate-500 flex items-center gap-1">
 													<Calendar className="w-3 h-3" />
@@ -495,11 +507,17 @@ export const MatchesScreen: React.FC = () => {
 											className="p-3 rounded-xl bg-slate-900/60 border border-yellow-500/10 text-xs flex justify-between items-center"
 										>
 											<div>
-												<p className="font-semibold text-slate-300">
+												<p className="font-semibold text-slate-300 flex items-center gap-1.5 flex-wrap">
 													{t('matches.challengeAgainst')}{' '}
 													<strong className="text-white">
 														@{match.player2?.username}
 													</strong>
+													{match.is_friendly && (
+														<span className="badge badge-sm font-extrabold text-[9px] bg-sky-600 text-white border-none gap-1">
+															<Handshake className="w-2.5 h-2.5" />
+															{t('matches.friendlyBadge')}
+														</span>
+													)}
 												</p>
 												<span className="text-[10px] text-slate-500 font-mono">
 													{t('matches.recordedScore')} {p1} - {p2}
@@ -663,6 +681,51 @@ export const MatchesScreen: React.FC = () => {
 									)}
 								</div>
 
+								{/* Row 3: Tipo partita (Ranked vs Amichevole) */}
+								<div className="flex gap-0.5 bg-slate-950/60 p-0.5 rounded-full border border-slate-900 w-fit">
+									<button
+										onClick={() => {
+											setTypeFilter('all')
+											setVisibleLimit(10)
+										}}
+										className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all cursor-pointer ${
+											typeFilter === 'all'
+												? 'bg-slate-800 text-white'
+												: 'text-slate-500 hover:text-slate-400'
+										}`}
+									>
+										{t('matches.filterTypeAll')}
+									</button>
+									<button
+										onClick={() => {
+											setTypeFilter('ranked')
+											setVisibleLimit(10)
+										}}
+										className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer ${
+											typeFilter === 'ranked'
+												? 'bg-primary/20 text-primary border border-primary/35'
+												: 'text-slate-500 hover:text-slate-400 border border-transparent'
+										}`}
+									>
+										<Trophy className="w-2.5 h-2.5" />
+										{t('matches.filterTypeRanked')}
+									</button>
+									<button
+										onClick={() => {
+											setTypeFilter('friendly')
+											setVisibleLimit(10)
+										}}
+										className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer ${
+											typeFilter === 'friendly'
+												? 'bg-sky-500/20 text-sky-300 border border-sky-500/35'
+												: 'text-slate-500 hover:text-slate-400 border border-transparent'
+										}`}
+									>
+										<Handshake className="w-2.5 h-2.5" />
+										{t('matches.filterTypeFriendly')}
+									</button>
+								</div>
+
 								{/* Filtri Avanzati Collassabili */}
 								{showAdvanced && (
 									<div className="grid grid-cols-2 gap-3 pt-2.5 border-t border-slate-900/60">
@@ -725,6 +788,7 @@ export const MatchesScreen: React.FC = () => {
 								{(searchQuery ||
 									scopeFilter !== 'all' ||
 									outcomeFilter !== 'all' ||
+									typeFilter !== 'all' ||
 									timeFilter !== 'all' ||
 									formatFilter !== 'all') && (
 									<div className="flex justify-end pt-1 border-t border-slate-900/30">
@@ -733,6 +797,7 @@ export const MatchesScreen: React.FC = () => {
 												setSearchQuery('')
 												setScopeFilter('all')
 												setOutcomeFilter('all')
+												setTypeFilter('all')
 												setTimeFilter('all')
 												setFormatFilter('all')
 												setVisibleLimit(10)
@@ -769,13 +834,21 @@ export const MatchesScreen: React.FC = () => {
 										return (
 											<div
 												key={match.id}
-												className="rounded-2xl bg-neutral/85 border border-slate-800/80 shadow-sm overflow-hidden"
+												className={`rounded-2xl bg-neutral/85 border shadow-sm overflow-hidden ${match.is_friendly ? 'border-sky-500/25' : 'border-slate-800/80'}`}
 											>
 												<div className="px-4 pt-4 pb-3">
 													<div className="flex justify-between items-center text-[10px] text-slate-500 mb-3 border-b border-slate-800 pb-2">
-														<span className="font-mono">
-															{t('matches.matchId')}
-															{match.id.substring(0, 8)}
+														<span className="flex items-center gap-1.5">
+															{match.is_friendly && (
+																<span className="badge badge-sm font-extrabold text-[9px] text-white bg-sky-600 border-none gap-1 px-1.5">
+																	<Handshake className="w-2.5 h-2.5" />
+																	{t('matches.friendlyBadge')}
+																</span>
+															)}
+															<span className="font-mono">
+																{t('matches.matchId')}
+																{match.id.substring(0, 8)}
+															</span>
 														</span>
 														<span className="flex items-center gap-1">
 															<Calendar className="w-3 h-3" />
@@ -881,6 +954,12 @@ export const MatchesScreen: React.FC = () => {
 															</span>
 														))}
 													</div>
+
+													{match.is_friendly && (
+														<p className="text-center text-[10px] text-sky-400/80 font-semibold mt-2.5">
+															{t('matches.noRankingImpact')}
+														</p>
+													)}
 												</div>
 
 												{/* Footer correzione */}

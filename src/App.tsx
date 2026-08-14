@@ -9,7 +9,7 @@ import { LoginScreen } from './screen/LoginScreen'
 import { ResetPasswordScreen } from './screen/ResetPasswordScreen'
 import { LeaderboardScreen } from './screen/LeaderboardScreen'
 import { MatchesScreen } from './screen/MatchesScreen'
-import { NewMatchScreen } from './screen/NewMatchScreen'
+import { NewMatchScreen } from './screen/NewMatch/NewMatchScreen'
 import { ProfileScreen } from './screen/ProfileScreen'
 import { PlayerProfileScreen } from './screen/PlayerProfileScreen'
 

@@ -18,6 +18,7 @@ export interface Match {
 	player_2_id: string
 	best_of: 3 | 5
 	status: 'pending' | 'confirmed' | 'disputed'
+	is_friendly: boolean
 	elo_change_p1: number | null
 	elo_change_p2: number | null
 	player_1_confirmed: boolean
@@ -101,6 +102,7 @@ const INITIAL_MOCK_MATCHES: MatchWithSets[] = [
 		player_2_id: 'user-2',
 		best_of: 3,
 		status: 'confirmed',
+		is_friendly: false,
 		elo_change_p1: 15,
 		elo_change_p2: -15,
 		player_1_confirmed: true,
@@ -405,6 +407,7 @@ export const dbService = {
 			return matches
 				.map(match => ({
 					...match,
+					is_friendly: match.is_friendly ?? false,
 					correction_requested_by: match.correction_requested_by ?? null,
 					correction_sets: match.correction_sets ?? null,
 					correction_status: match.correction_status ?? null,
@@ -419,7 +422,8 @@ export const dbService = {
 		player1Id: string,
 		player2Id: string,
 		bestOf: 3 | 5,
-		setScores: { set_number: number; score_p1: number; score_p2: number }[]
+		setScores: { set_number: number; score_p1: number; score_p2: number }[],
+		isFriendly: boolean = false
 	): Promise<MatchWithSets> {
 		const currentUser = await this.getCurrentUser()
 		if (!currentUser) throw new Error('Devi essere autenticato per registrare un match')
@@ -436,6 +440,7 @@ export const dbService = {
 					player_2_id: player2Id,
 					best_of: bestOf,
 					status: 'pending',
+					is_friendly: isFriendly,
 					player_1_confirmed: !isArbitrated,
 					player_2_confirmed: false,
 				})
@@ -476,6 +481,7 @@ export const dbService = {
 				player_2_id: player2Id,
 				best_of: bestOf,
 				status: 'pending',
+				is_friendly: isFriendly,
 				elo_change_p1: null,
 				elo_change_p2: null,
 				player_1_confirmed: !isArbitrated,
@@ -537,6 +543,14 @@ export const dbService = {
 
 			const match = matches[matchIndex]
 			if (match.status === 'confirmed') throw new Error('Match già confermato')
+
+			if (match.is_friendly) {
+				match.status = 'confirmed'
+				match.elo_change_p1 = null
+				match.elo_change_p2 = null
+				localStorage.setItem('rp_matches', JSON.stringify(matches))
+				return match
+			}
 
 			// Calcola quanti set ha vinto ciascun giocatore
 			let setsWonP1 = 0
@@ -607,33 +621,39 @@ export const dbService = {
 			}
 
 			if (matches[idx].player_1_confirmed && matches[idx].player_2_confirmed) {
-				let setsWonP1 = 0
-				let setsWonP2 = 0
-				match.sets.forEach(s => {
-					if (s.score_p1 > s.score_p2) setsWonP1++
-					else setsWonP2++
-				})
+				if (match.is_friendly) {
+					matches[idx].status = 'confirmed'
+					matches[idx].elo_change_p1 = null
+					matches[idx].elo_change_p2 = null
+				} else {
+					let setsWonP1 = 0
+					let setsWonP2 = 0
+					match.sets.forEach(s => {
+						if (s.score_p1 > s.score_p2) setsWonP1++
+						else setsWonP2++
+					})
 
-				const profile1 = profiles.find(p => p.id === match.player_1_id)
-				const profile2 = profiles.find(p => p.id === match.player_2_id)
-				if (!profile1 || !profile2) throw new Error('Giocatori non trovati')
+					const profile1 = profiles.find(p => p.id === match.player_1_id)
+					const profile2 = profiles.find(p => p.id === match.player_2_id)
+					if (!profile1 || !profile2) throw new Error('Giocatori non trovati')
 
-				const { changeA, changeB } = calculateEloTS(
-					profile1.elo_rating,
-					profile2.elo_rating,
-					setsWonP1,
-					setsWonP2,
-					profile1.player_type,
-					profile2.player_type
-				)
+					const { changeA, changeB } = calculateEloTS(
+						profile1.elo_rating,
+						profile2.elo_rating,
+						setsWonP1,
+						setsWonP2,
+						profile1.player_type,
+						profile2.player_type
+					)
 
-				profile1.elo_rating = Math.max(0, profile1.elo_rating + changeA)
-				profile2.elo_rating = Math.max(0, profile2.elo_rating + changeB)
-				matches[idx].status = 'confirmed'
-				matches[idx].elo_change_p1 = changeA
-				matches[idx].elo_change_p2 = changeB
+					profile1.elo_rating = Math.max(0, profile1.elo_rating + changeA)
+					profile2.elo_rating = Math.max(0, profile2.elo_rating + changeB)
+					matches[idx].status = 'confirmed'
+					matches[idx].elo_change_p1 = changeA
+					matches[idx].elo_change_p2 = changeB
 
-				localStorage.setItem('rp_profiles', JSON.stringify(profiles))
+					localStorage.setItem('rp_profiles', JSON.stringify(profiles))
+				}
 			}
 
 			localStorage.setItem('rp_matches', JSON.stringify(matches))
@@ -732,6 +752,25 @@ export const dbService = {
 				throw new Error('Non puoi approvare la tua stessa richiesta')
 			if (currentUser.id !== m.player_1_id && currentUser.id !== m.player_2_id)
 				throw new Error('Non sei un giocatore di questo match')
+
+			if (m.is_friendly) {
+				// Amichevole: aggiorna solo i punteggi, nessun impatto sull'Elo
+				const newSets = m.correction_sets!
+				newSets.forEach(ns => {
+					const s = matches[idx].sets.find(s => s.set_number === ns.set_number)
+					if (s) {
+						s.score_p1 = ns.score_p1
+						s.score_p2 = ns.score_p2
+					}
+				})
+
+				matches[idx].correction_status = 'approved'
+				matches[idx].correction_requested_by = null
+				matches[idx].correction_sets = null
+
+				localStorage.setItem('rp_matches', JSON.stringify(matches))
+				return
+			}
 
 			const profile1 = profiles.find(p => p.id === m.player_1_id)!
 			const profile2 = profiles.find(p => p.id === m.player_2_id)!

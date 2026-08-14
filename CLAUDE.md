@@ -1,61 +1,78 @@
-# RankPong — Istruzioni per Claude
+# RankPong — Instructions for Claude
 
-## Stack tecnico
+## Tech stack
 
 - **Frontend**: React + TypeScript + Vite
-- **Styling**: Tailwind CSS + DaisyUI (tema dark, base `slate-900/950`)
+- **Styling**: Tailwind CSS + DaisyUI (dark theme, `slate-900/950` base)
 - **Backend**: Supabase (Auth, Postgres, RLS, Triggers, RPC functions)
-- **Stato globale**: Zustand (`src/store/useAppStore.ts`)
-- **i18n**: react-i18next, lingua unica italiana (`src/i18n/locales/it.ts`)
+- **Global state**: Zustand (`src/store/useAppStore.ts`)
+- **i18n**: react-i18next, single locale Italian (`src/i18n/locales/it.ts`)
 - **Deploy**: Netlify (SPA redirect via `netlify.toml`)
 
-## Struttura file principali
+## Main file structure
 
 ```
 src/
-  screen/           # Una schermata per file (MatchesScreen, NewMatchScreen, ...)
-  services/db.ts    # Tutti i metodi DB (Supabase + mock localStorage)
+  screen/           # One screen per file (MatchesScreen, NewMatchScreen, ...)
+  services/db.ts    # All DB methods (Supabase + localStorage mock)
   store/            # Zustand store
-  i18n/locales/it.ts  # Tutte le stringhe UI
-supabase-schema.sql # Schema completo + trigger + RPC functions
+  i18n/locales/it.ts  # All UI strings
+supabase-schema.sql # Full schema + triggers + RPC functions
 ```
 
-## Regole di sviluppo
+## Development rules
 
-### i18n — sempre
+### i18n — always
 
-Ogni stringa visibile all'utente va in `src/i18n/locales/it.ts` e richiamata con `t('chiave')`.
-Non hardcodare mai testo italiano direttamente nei componenti.
+Every user-visible string goes in `src/i18n/locales/it.ts` and is called with `t('key')`.
+Never hardcode Italian text directly in components.
 
-### UI — componenti e pattern
+### UI — components and patterns
 
-- **Modali**: usare modali centrati (`fixed inset-0 flex items-center justify-center`), **non** bottom sheet.
-    - Struttura: Header (titolo + subtitle) / Corpo / Footer con bottoni.
-    - Click fuori dalla card chiude il modale: `onClick` sull'overlay con `e.target === e.currentTarget`.
-- **Bottoni CTA primari**: usare classi Tailwind esplicite quando il colore deve essere garantito (es. `bg-orange-500 hover:bg-orange-400 text-white border-none`), non affidarsi ciecamente alle varianti DaisyUI (`btn-warning`) che possono avere testo illeggibile a seconda del tema.
-- **Bottoni secondari/cancel**: `btn btn-ghost border border-slate-700 text-slate-300`.
-- **Spacing modale**: `px-6 pt-6 pb-4` header / `px-6 py-5` corpo / `px-6 pb-6` footer.
-- **Sezioni card**: usare `overflow-hidden` sulla card e separare aree con `border-t border-slate-800/60` + background distinto per i footer di stato.
+- **Modals**: use centered modals (`fixed inset-0 flex items-center justify-center`), **not** bottom sheets.
+    - Structure: Header (title + subtitle) / Body / Footer with buttons.
+    - Clicking outside the card closes the modal: `onClick` on the overlay with `e.target === e.currentTarget`.
+- **Primary CTA buttons**: use explicit Tailwind classes when the color must be guaranteed (e.g. `bg-orange-500 hover:bg-orange-400 text-white border-none`), don't blindly rely on DaisyUI variants (`btn-warning`) which can have unreadable text depending on the theme.
+- **Secondary/cancel buttons**: `btn btn-ghost border border-slate-700 text-slate-300`.
+- **Modal spacing**: `px-6 pt-6 pb-4` header / `px-6 py-5` body / `px-6 pb-6` footer.
+- **Card sections**: use `overflow-hidden` on the card and separate areas with `border-t border-slate-800/60` + a distinct background for status footers.
 
-### Logica DB — doppio binario Supabase/mock
+### DB logic — Supabase/mock dual track
 
-`db.ts` mantiene sempre due implementazioni per ogni metodo:
+`db.ts` always keeps two implementations for every method:
 
-1. Ramo `if (isSupabaseConfigured && supabase)` → chiamate reali Supabase
-2. Ramo `else` → mock su `localStorage` con la stessa logica replicata in TypeScript
+1. `if (isSupabaseConfigured && supabase)` branch → real Supabase calls
+2. `else` branch → `localStorage` mock with the same logic replicated in TypeScript
 
-Le RPC functions Supabase (security definer) bypassano RLS: usarle per operazioni multi-tabella atomiche (es. approvazione correzione con Elo recalc).
+Supabase RPC functions (security definer) bypass RLS: use them for atomic multi-table operations (e.g. approving a correction with Elo recalculation).
 
-### Schema SQL
+### SQL schema
 
-Le modifiche allo schema vanno sempre aggiunte in fondo a `supabase-schema.sql` con una sezione numerata e commentata. Non modificare le sezioni esistenti (1-4), aggiungere sezioni nuove (5, 6, ...).
+Schema changes always get appended to the bottom of `supabase-schema.sql` as a new numbered, commented section. Don't modify existing sections (1-4), add new ones (5, 6, ...).
 
-## Feature: Correzione punteggi match
+## Component architecture — progressive decomposition
 
-Flusso: giocatore richiede → avversario approva/rifiuta → Elo reversato e ricalcolato.
+Screens currently live as single, large files under `src/screen/` (e.g. `MatchesScreen.tsx`, `NewMatchScreen.tsx` are each several hundred lines mixing data fetching, filtering logic, and inline JSX for every card/section/modal). This isn't being refactored in one pass — instead, **whenever you're already touching a screen for a feature or fix**, look for pieces that are ready to be pulled out into their own subcomponent, and extract them as part of that same change.
 
-Campi su `matches`: `correction_requested_by`, `correction_sets` (jsonb), `correction_status` (pending/approved/rejected).
+Signals that a chunk is ready to become its own component:
+
+- **Repetition**: near-identical JSX blocks for different states (e.g. a match card rendered slightly differently across "pending", "confirmed", "disputed" sections).
+- **Size**: a self-contained visual unit (a card, a modal, a filter bar/toolbar) whose JSX runs past ~100-150 lines on its own.
+- **Self-contained state/logic**: a piece that manages its own local state or handlers and doesn't need much from the parent beyond a few props/callbacks (a correction modal, a search+filters panel).
+
+Conventions when extracting:
+
+- Place screen-specific subcomponents next to the screen, e.g. `src/screen/Matches/MatchCard.tsx`, `src/screen/Matches/CorrectionModal.tsx` (co-locate rather than dumping everything into a generic `src/components/`), and keep the screen file (`MatchesScreen.tsx`) as the orchestrator: data fetching, filters, and composition of the subcomponents.
+- Only promote a component to a shared `src/components/` location once it's actually reused across 2+ screens — don't do this preemptively.
+- Keep props explicit and typed; don't reach into global store from a leaf subcomponent if the data can be passed down instead — makes it easier to see what a component actually depends on.
+- Extract incrementally, scoped to what the current task touches. Don't turn an unrelated bug fix into a full-screen refactor — pull out only what's in your way or what you're already rewriting.
+
+## Feature: Match score correction
+
+Flow: player requests → opponent approves/rejects → Elo reversed and recalculated.
+
+Fields on `matches`: `correction_requested_by`, `correction_sets` (jsonb), `correction_status` (pending/approved/rejected).
 
 RPC functions: `request_correction`, `approve_correction`, `reject_correction`.
 
-Il badge di notifica sul tab Partite include sia i match pending da confermare sia le correzioni in attesa di risposta dall'avversario.
+The notification badge on the Matches tab includes both pending matches to confirm and corrections awaiting a response from the opponent.

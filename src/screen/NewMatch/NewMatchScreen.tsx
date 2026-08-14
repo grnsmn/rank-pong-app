@@ -1,12 +1,14 @@
 import React, { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { dbService, type Profile } from '../services/db'
-import { useAppStore } from '../store/useAppStore'
-import { useDataFetch } from '../hooks/useDataFetch'
-import { useFormState } from '../hooks/useFormState'
-import { useClickOutside } from '../hooks/useClickOutside'
-import { useSessionState } from '../hooks/useSessionState'
-import { AlertTriangle, CheckCircle2, Check, Scale } from 'lucide-react'
+import { dbService, type Profile } from '../../services/db'
+import { useAppStore } from '../../store/useAppStore'
+import { useDataFetch } from '../../hooks/useDataFetch'
+import { useFormState } from '../../hooks/useFormState'
+import { useClickOutside } from '../../hooks/useClickOutside'
+import { useSessionState } from '../../hooks/useSessionState'
+import { AlertTriangle, CheckCircle2, Check, Scale, Handshake } from 'lucide-react'
+import { ToggleCard } from './ToggleCard'
+import { PlayerPicker } from './PlayerPicker'
 
 interface SetInput {
 	score1: string
@@ -16,6 +18,7 @@ interface SetInput {
 // Chiavi sessionStorage per persistere il form durante la sessione
 const SS = {
 	arbitrator: 'newMatch.isArbitratorMode',
+	friendly: 'newMatch.isFriendly',
 	player1Id: 'newMatch.player1Id',
 	player1Search: 'newMatch.player1Search',
 	opponentId: 'newMatch.opponentId',
@@ -43,6 +46,7 @@ export const NewMatchScreen: React.FC = () => {
 	} = useFormState()
 
 	const [isArbitratorMode, setIsArbitratorMode] = useSessionState(SS.arbitrator, false)
+	const [isFriendly, setIsFriendly] = useSessionState(SS.friendly, false)
 	const [player1Id, setPlayer1Id] = useSessionState(SS.player1Id, '')
 	const [player1Search, setPlayer1Search] = useSessionState(SS.player1Search, '')
 	const [showPlayer1Dropdown, setShowPlayer1Dropdown] = useState(false)
@@ -236,10 +240,20 @@ export const NewMatchScreen: React.FC = () => {
 			}))
 
 			const finalPlayer1Id = isArbitratorMode ? player1Id : currentUser?.id || ''
-			await dbService.createMatch(finalPlayer1Id, opponentId, bestOf, formattedScores)
+			await dbService.createMatch(
+				finalPlayer1Id,
+				opponentId,
+				bestOf,
+				formattedScores,
+				isFriendly
+			)
 
 			setSuccessMsg(
-				isArbitratorMode ? t('newMatch.arbitratorSuccess') : t('newMatch.successSubmit')
+				isFriendly
+					? t('newMatch.friendlySuccess')
+					: isArbitratorMode
+						? t('newMatch.arbitratorSuccess')
+						: t('newMatch.successSubmit')
 			)
 			setPlayer1Id('')
 			setPlayer1Search('')
@@ -267,6 +281,10 @@ export const NewMatchScreen: React.FC = () => {
 		return p.display_name.toLowerCase().includes(q) || p.username.toLowerCase().includes(q)
 	})
 
+	const playersSelected = isArbitratorMode
+		? player1Id !== '' && opponentId !== ''
+		: opponentId !== ''
+
 	return (
 		<div className="flex flex-col h-full bg-base-100 text-white">
 			<div className="px-4 pt-6 pb-2">
@@ -277,160 +295,90 @@ export const NewMatchScreen: React.FC = () => {
 			</div>
 
 			<div className="flex-1 overflow-y-auto px-4 pb-24">
-				<form onSubmit={handleSubmit} className="space-y-5 pt-3">
-					{/* Toggle modalità arbitro */}
-					<button
-						type="button"
-						onClick={handleArbitratorToggle}
-						className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${
-							isArbitratorMode
-								? 'border-purple-500/50 bg-purple-950/30 text-purple-300'
-								: 'border-slate-700 bg-transparent text-slate-400 hover:border-slate-600'
-						}`}
-					>
-						<Scale className="w-4 h-4 shrink-0" />
-						<div className="flex-1 text-left">
-							<span className="text-xs font-bold block">
-								{t('newMatch.arbitratorToggle')}
-							</span>
-							<span className="text-[10px] opacity-70">
-								{t('newMatch.arbitratorToggleDesc')}
-							</span>
-						</div>
-						<div
-							className={`w-9 h-5 rounded-full transition-colors relative shrink-0 ${isArbitratorMode ? 'bg-purple-500' : 'bg-slate-700'}`}
-						>
-							<div
-								className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${isArbitratorMode ? 'translate-x-4' : 'translate-x-0.5'}`}
-							/>
-						</div>
-					</button>
+				<form onSubmit={handleSubmit} className="space-y-4 pt-3">
+					<ToggleCard
+						icon={Scale}
+						label={t('newMatch.arbitratorToggle')}
+						description={t('newMatch.arbitratorToggleDesc')}
+						checked={isArbitratorMode}
+						onChange={handleArbitratorToggle}
+						accent="purple"
+					/>
 
-					{/* Picker Giocatore 1 (solo in modalità arbitro) */}
+					<ToggleCard
+						icon={Handshake}
+						label={t('newMatch.friendlyToggle')}
+						description={t('newMatch.friendlyToggleDesc')}
+						checked={isFriendly}
+						onChange={() => setIsFriendly(prev => !prev)}
+						accent="sky"
+					/>
+
 					{isArbitratorMode && (
-						<div className="form-control w-full p-4 rounded-2xl bg-neutral border border-slate-800">
-							<label className="label py-1">
-								<span className="label-text text-xs text-slate-300 font-bold">
-									{t('newMatch.stepPlayer1')}
-								</span>
-							</label>
-							<div ref={player1Ref} className="relative mt-1">
-								<input
-									type="text"
-									className="input input-sm w-full bg-slate-950 border-slate-800 text-white rounded-xl focus:border-primary focus:outline-none placeholder-slate-500 text-xs h-8 pl-3"
-									placeholder={
-										selectedPlayer1
-											? `${selectedPlayer1.display_name} (@${selectedPlayer1.username}) — ${selectedPlayer1.elo_rating} ${t('common.elo')}`
-											: t('newMatch.player1Placeholder')
-									}
-									value={player1Search}
-									onChange={e => {
-										setPlayer1Search(e.target.value)
-										setPlayer1Id('')
-										setShowPlayer1Dropdown(true)
-									}}
-									onFocus={() => setShowPlayer1Dropdown(true)}
-								/>
-								{showPlayer1Dropdown && (
-									<ul className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-xl max-h-48 overflow-y-auto">
-										{filteredPlayer1Profiles.length === 0 ? (
-											<li className="px-3 py-2 text-xs text-slate-500">
-												{t('newMatch.noPlayersFound')}
-											</li>
-										) : (
-											filteredPlayer1Profiles.map(p => (
-												<li
-													key={p.id}
-													className={`px-3 py-2 text-sm cursor-pointer flex items-center justify-between hover:bg-slate-700 ${player1Id === p.id ? 'text-primary' : 'text-white'}`}
-													onMouseDown={() => {
-														setPlayer1Id(p.id)
-														setPlayer1Search('')
-														setShowPlayer1Dropdown(false)
-													}}
-												>
-													<span>
-														{p.display_name}{' '}
-														<span className="text-slate-400 text-xs">
-															@{p.username}
-														</span>
-													</span>
-													<span className="text-xs text-slate-400 ml-2 shrink-0">
-														{p.elo_rating} {t('common.elo')}
-													</span>
-												</li>
-											))
-										)}
-									</ul>
-								)}
-							</div>
-						</div>
+						<PlayerPicker
+							containerRef={player1Ref}
+							label={t('newMatch.stepPlayer1')}
+							placeholder={
+								selectedPlayer1
+									? `${selectedPlayer1.display_name} (@${selectedPlayer1.username}) — ${selectedPlayer1.elo_rating} ${t('common.elo')}`
+									: t('newMatch.player1Placeholder')
+							}
+							searchValue={player1Search}
+							onSearchChange={value => {
+								setPlayer1Search(value)
+								setPlayer1Id('')
+								setShowPlayer1Dropdown(true)
+							}}
+							showDropdown={showPlayer1Dropdown}
+							onFocus={() => setShowPlayer1Dropdown(true)}
+							profiles={filteredPlayer1Profiles}
+							selectedId={player1Id}
+							onSelect={id => {
+								setPlayer1Id(id)
+								setPlayer1Search('')
+								setShowPlayer1Dropdown(false)
+							}}
+							noResultsLabel={t('newMatch.noPlayersFound')}
+							eloLabel={t('common.elo')}
+						/>
 					)}
 
-					{/* Picker avversario (Giocatore 2 in modalità arbitro) */}
-					<div className="form-control w-full p-4 rounded-2xl bg-neutral border border-slate-800">
-						<label className="label py-1">
-							<span className="label-text text-xs text-slate-300 font-bold">
-								{isArbitratorMode
-									? t('newMatch.stepPlayer2')
-									: t('newMatch.stepOpponent')}
-							</span>
-						</label>
-						<div ref={opponentRef} className="relative mt-1">
-							<input
-								type="text"
-								className="input input-sm w-full bg-slate-950 border-slate-800 text-white rounded-xl focus:border-primary focus:outline-none placeholder-slate-500 text-xs h-8 pl-3"
-								placeholder={
-									selectedOpponent
-										? `${selectedOpponent.display_name} (@${selectedOpponent.username}) — ${selectedOpponent.elo_rating} ${t('common.elo')}`
-										: isArbitratorMode
-											? t('newMatch.player2Placeholder')
-											: t('newMatch.opponentPlaceholder')
-								}
-								value={opponentSearch}
-								onChange={e => {
-									setOpponentSearch(e.target.value)
-									setOpponentId('')
-									setShowOpponentDropdown(true)
-								}}
-								onFocus={() => setShowOpponentDropdown(true)}
-							/>
-							{showOpponentDropdown && (
-								<ul className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-xl max-h-48 overflow-y-auto">
-									{filteredOpponentProfiles.length === 0 ? (
-										<li className="px-3 py-2 text-xs text-slate-500">
-											{t('newMatch.noPlayersFound')}
-										</li>
-									) : (
-										filteredOpponentProfiles.map(p => (
-											<li
-												key={p.id}
-												className={`px-3 py-2 text-sm cursor-pointer flex items-center justify-between hover:bg-slate-700 ${opponentId === p.id ? 'text-primary' : 'text-white'}`}
-												onMouseDown={() => {
-													setOpponentId(p.id)
-													setOpponentSearch('')
-													setShowOpponentDropdown(false)
-												}}
-											>
-												<span>
-													{p.display_name}{' '}
-													<span className="text-slate-400 text-xs">
-														@{p.username}
-													</span>
-												</span>
-												<span className="text-xs text-slate-400 ml-2 shrink-0">
-													{p.elo_rating} {t('common.elo')}
-												</span>
-											</li>
-										))
-									)}
-								</ul>
-							)}
-						</div>
-					</div>
+					<PlayerPicker
+						containerRef={opponentRef}
+						label={
+							isArbitratorMode
+								? t('newMatch.stepPlayer2')
+								: t('newMatch.stepOpponent')
+						}
+						placeholder={
+							selectedOpponent
+								? `${selectedOpponent.display_name} (@${selectedOpponent.username}) — ${selectedOpponent.elo_rating} ${t('common.elo')}`
+								: isArbitratorMode
+									? t('newMatch.player2Placeholder')
+									: t('newMatch.opponentPlaceholder')
+						}
+						searchValue={opponentSearch}
+						onSearchChange={value => {
+							setOpponentSearch(value)
+							setOpponentId('')
+							setShowOpponentDropdown(true)
+						}}
+						showDropdown={showOpponentDropdown}
+						onFocus={() => setShowOpponentDropdown(true)}
+						profiles={filteredOpponentProfiles}
+						selectedId={opponentId}
+						onSelect={id => {
+							setOpponentId(id)
+							setOpponentSearch('')
+							setShowOpponentDropdown(false)
+						}}
+						noResultsLabel={t('newMatch.noPlayersFound')}
+						eloLabel={t('common.elo')}
+					/>
 
-					<div className="p-4 rounded-2xl bg-neutral border border-slate-800">
+					<div className="p-4 rounded-2xl bg-slate-900/60 shadow-md shadow-black/20">
 						<label className="label py-0 mb-2">
-							<span className="label-text text-xs text-slate-300 font-bold">
+							<span className="label-text text-xs text-slate-300 font-bold tracking-wide">
 								{t('newMatch.stepFormat')}
 							</span>
 						</label>
@@ -440,10 +388,10 @@ export const NewMatchScreen: React.FC = () => {
 									key={n}
 									type="button"
 									onClick={() => handleBestOfChange(n)}
-									className={`flex-1 flex flex-col items-center gap-1 py-2.5 px-2 rounded-xl border-2 transition-all ${
+									className={`flex-1 flex flex-col items-center gap-1 py-2.5 px-2 rounded-xl transition-all ${
 										bestOf === n
-											? 'border-primary bg-primary/10 text-primary'
-											: 'border-slate-700 bg-transparent text-slate-400 hover:border-slate-500'
+											? 'bg-primary text-white shadow-md shadow-primary/30'
+											: 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
 									}`}
 								>
 									<span className="font-bold text-xs uppercase tracking-wider">
@@ -464,12 +412,10 @@ export const NewMatchScreen: React.FC = () => {
 						</p>
 					</div>
 
-					{(isArbitratorMode
-						? player1Id !== '' && opponentId !== ''
-						: opponentId !== '') && (
-						<div className="p-4 rounded-2xl bg-neutral border border-slate-800 space-y-4">
-							<div className="flex justify-between items-center pb-2 border-b border-slate-800">
-								<span className="text-xs font-bold text-slate-300">
+					{playersSelected && (
+						<div className="p-4 rounded-2xl bg-slate-900/60 shadow-md shadow-black/20 space-y-4">
+							<div className="flex justify-between items-center pb-2 border-b border-white/5">
+								<span className="text-xs font-bold text-slate-300 tracking-wide">
 									{t('newMatch.stepScores')}
 								</span>
 								<span className="text-[10px] text-slate-500 font-semibold uppercase">
@@ -488,7 +434,7 @@ export const NewMatchScreen: React.FC = () => {
 									return (
 										<div
 											key={index}
-											className="flex items-center gap-3 bg-slate-950/40 p-2.5 rounded-xl border border-slate-850"
+											className="flex items-center gap-3 bg-slate-950/40 p-2.5 rounded-xl"
 										>
 											<span className="text-xs font-black text-slate-400 w-12 shrink-0">
 												{t('common.set')} {index + 1}
@@ -504,7 +450,7 @@ export const NewMatchScreen: React.FC = () => {
 															)[0] ?? 'P1')
 														: t('common.you')
 												}
-												className="input input-sm w-full bg-slate-950 border-slate-800 text-white rounded-xl focus:border-primary focus:outline-none text-center font-bold text-sm h-8"
+												className="input input-sm w-full bg-slate-950 border-none rounded-xl focus:ring-2 focus:ring-primary/50 focus:outline-none text-center font-bold text-sm h-9"
 												value={set.score1}
 												onChange={e =>
 													handleSetChange(index, 1, e.target.value)
@@ -526,7 +472,7 @@ export const NewMatchScreen: React.FC = () => {
 															)[0] ?? 'P2')
 														: t('common.opponent')
 												}
-												className="input input-sm w-full bg-slate-950 border-slate-800 text-white rounded-xl focus:border-primary focus:outline-none text-center font-bold text-sm h-8"
+												className="input input-sm w-full bg-slate-950 border-none rounded-xl focus:ring-2 focus:ring-primary/50 focus:outline-none text-center font-bold text-sm h-9"
 												value={set.score2}
 												onChange={e =>
 													handleSetChange(index, 2, e.target.value)
@@ -561,7 +507,7 @@ export const NewMatchScreen: React.FC = () => {
 									<button
 										type="button"
 										onClick={addSetRow}
-										className="btn btn-outline btn-sm btn-primary flex-1 text-xs font-bold"
+										className="btn btn-sm flex-1 text-xs font-bold border-none bg-primary/15 text-primary hover:bg-primary/25"
 									>
 										{t('newMatch.nextSet')}
 									</button>
@@ -570,7 +516,7 @@ export const NewMatchScreen: React.FC = () => {
 									<button
 										type="button"
 										onClick={removeLastSetRow}
-										className="btn btn-outline btn-error btn-sm text-xs font-bold w-12"
+										className="btn btn-sm text-xs font-bold w-12 border-none bg-error/15 text-error hover:bg-error/25"
 										title={t('newMatch.removeLastSet')}
 									>
 										{t('newMatch.removeSet')}
@@ -580,25 +526,19 @@ export const NewMatchScreen: React.FC = () => {
 						</div>
 					)}
 
-					{status.errors.length > 0 &&
-						(isArbitratorMode
-							? player1Id !== '' && opponentId !== ''
-							: opponentId !== '') && (
-							<div className="p-3 bg-warning/10 border border-warning/20 text-warning rounded-xl text-xs space-y-1">
-								<div className="flex items-center gap-1.5 font-bold mb-1">
-									<AlertTriangle className="w-4 h-4" />{' '}
-									{t('newMatch.scoreErrors')}
-								</div>
-								{status.errors.map((err, i) => (
-									<div key={i}>• {err}</div>
-								))}
+					{status.errors.length > 0 && playersSelected && (
+						<div className="p-3 bg-warning/10 text-warning rounded-xl text-xs space-y-1">
+							<div className="flex items-center gap-1.5 font-bold mb-1">
+								<AlertTriangle className="w-4 h-4" /> {t('newMatch.scoreErrors')}
 							</div>
-						)}
+							{status.errors.map((err, i) => (
+								<div key={i}>• {err}</div>
+							))}
+						</div>
+					)}
 
-					{(isArbitratorMode
-						? player1Id !== '' && opponentId !== ''
-						: opponentId !== '') && (
-						<div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+					{playersSelected && (
+						<div className="p-4 rounded-2xl bg-slate-900/60 shadow-md shadow-black/20 space-y-2">
 							<div className="flex justify-between items-center text-xs">
 								<span>
 									{isArbitratorMode
@@ -619,7 +559,7 @@ export const NewMatchScreen: React.FC = () => {
 								</span>
 							</div>
 
-							<div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+							<div className="pt-2 border-t border-white/5 flex items-center justify-between">
 								<span className="text-xs font-bold">
 									{t('newMatch.matchStatus')}
 								</span>
@@ -660,9 +600,9 @@ export const NewMatchScreen: React.FC = () => {
 					<button
 						type="submit"
 						disabled={!status.canSubmit || isLoading}
-						className={`btn w-full font-bold uppercase tracking-wider rounded-xl border-none text-white ${
+						className={`btn w-full font-bold uppercase tracking-wider rounded-2xl border-none text-white py-3.5 h-auto ${
 							status.canSubmit && !isLoading
-								? 'bg-orange-500 hover:bg-orange-400'
+								? 'bg-orange-500 hover:bg-orange-400 shadow-lg shadow-orange-500/25'
 								: 'bg-slate-700 text-slate-500 cursor-not-allowed'
 						} ${isLoading ? 'loading' : ''}`}
 					>
