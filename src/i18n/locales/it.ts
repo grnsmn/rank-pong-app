@@ -83,7 +83,6 @@ const it = {
 	},
 	matches: {
 		title: 'Partite e Richieste',
-		subtitle: 'Approva i risultati o consulta la cronologia',
 		pendingTitle: 'Richieste in Sospeso',
 		confirmRequest: 'CONFERMA RICHIESTA',
 		challenged: 'ti ha sfidato a una partita (Best of',
@@ -130,6 +129,8 @@ const it = {
 		friendlyBadge: 'AMICHEVOLE',
 		rankedBadge: 'RANKED',
 		noRankingImpact: 'Nessun impatto sul ranking',
+		disputedInfo:
+			"Il risultato non viene confermato e non conta ai fini del ranking. Non esiste una risoluzione automatica: accordati con l'avversario per registrare una nuova partita se necessario.",
 		awaitingYourConfirm: 'Richiede la tua conferma',
 		filterSearchPlaceholder: 'Cerca giocatore...',
 		filterAllMatches: 'Tutte le partite',
@@ -147,6 +148,7 @@ const it = {
 		filterFormatAll: 'Tutti i formati',
 		filterFormat3: 'Best of 3',
 		filterFormat5: 'Best of 5',
+		filterIncludeAlso: 'Includi anche',
 		filterShowAdvanced: 'Filtri avanzati',
 		filterHideAdvanced: 'Nascondi filtri',
 		filterClear: 'Azzera filtri',

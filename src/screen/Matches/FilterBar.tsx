@@ -21,6 +21,10 @@ interface FilterBarProps {
 	onTimeChange: (value: TimeFilter) => void
 	formatFilter: FormatFilter
 	onFormatChange: (value: FormatFilter) => void
+	includeDisputed: boolean
+	onIncludeDisputedChange: (value: boolean) => void
+	includeWaiting: boolean
+	onIncludeWaitingChange: (value: boolean) => void
 	showAdvanced: boolean
 	onToggleAdvanced: () => void
 	hasActiveFilters: boolean
@@ -40,6 +44,10 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 	onTimeChange,
 	formatFilter,
 	onFormatChange,
+	includeDisputed,
+	onIncludeDisputedChange,
+	includeWaiting,
+	onIncludeWaitingChange,
 	showAdvanced,
 	onToggleAdvanced,
 	hasActiveFilters,
@@ -49,30 +57,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
 	return (
 		<div className="bg-slate-900/40 rounded-2xl p-3.5 space-y-3 shadow-sm shadow-black/20">
-			{/* Row 1: Ricerca giocatore */}
-			<div className="relative">
-				<span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500 pointer-events-none">
-					<Search className="w-3.5 h-3.5" />
-				</span>
-				<input
-					type="text"
-					value={searchQuery}
-					onChange={e => onSearchChange(e.target.value)}
-					placeholder={t('matches.filterSearchPlaceholder')}
-					className="input input-sm pl-8.5 pr-8 w-full bg-slate-950 border-none text-white rounded-xl focus:ring-2 focus:ring-primary/50 focus:outline-none placeholder-slate-500 text-xs h-8"
-				/>
-				{searchQuery && (
-					<button
-						onClick={() => onSearchChange('')}
-						className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-500 hover:text-slate-300"
-					>
-						<X className="w-3.5 h-3.5" />
-					</button>
-				)}
-			</div>
-
-			{/* Row 2: Scope pills (All vs Mine) e Outcome filters */}
-			<div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-900/60 pt-2.5">
+			{/* Row 1: Scope pills (All vs Mine) e Outcome filters */}
+			<div className="flex flex-wrap items-center justify-between gap-2">
 				{/* Scope Pills */}
 				<div className="flex gap-1">
 					<button
@@ -135,8 +121,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 				)}
 			</div>
 
-			{/* Row 3: Tipo partita (Ranked vs Amichevole) e Toggle Filtri Avanzati */}
-			<div className="flex flex-wrap items-center justify-between gap-2">
+			{/* Row 2: Tipo partita (Ranked vs Amichevole) e Toggle Filtri Avanzati */}
+			<div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-900/60 pt-2.5">
 				<div className="flex gap-0.5 bg-slate-950/60 p-0.5 rounded-full shadow-inner shadow-black/20 w-fit">
 					<button
 						onClick={() => onTypeChange('all')}
@@ -191,42 +177,93 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 				</button>
 			</div>
 
+			{/* Row 3: Ricerca giocatore */}
+			<div className="relative">
+				<span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500 pointer-events-none">
+					<Search className="w-3.5 h-3.5" />
+				</span>
+				<input
+					type="text"
+					value={searchQuery}
+					onChange={e => onSearchChange(e.target.value)}
+					placeholder={t('matches.filterSearchPlaceholder')}
+					className="input input-sm pl-8.5 pr-8 w-full bg-slate-950 border-none text-white rounded-xl focus:ring-2 focus:ring-primary/50 focus:outline-none placeholder-slate-500 text-xs h-8"
+				/>
+				{searchQuery && (
+					<button
+						onClick={() => onSearchChange('')}
+						className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-500 hover:text-slate-300"
+					>
+						<X className="w-3.5 h-3.5" />
+					</button>
+				)}
+			</div>
+
 			{/* Filtri Avanzati Collassabili */}
 			{showAdvanced && (
-				<div className="grid grid-cols-2 gap-3 pt-2.5 border-t border-slate-900/60">
-					{/* Periodo Temporale */}
-					<div className="space-y-1">
-						<label className="text-[9px] font-bold uppercase tracking-wider text-slate-500 pl-0.5">
-							{t('matches.filterTimeAll')}
-						</label>
-						<select
-							value={timeFilter}
-							onChange={e => onTimeChange(e.target.value as TimeFilter)}
-							className="select select-xs w-full bg-slate-950 border-none text-slate-300 rounded-xl focus:ring-2 focus:ring-primary/50 focus:outline-none py-1 h-8 text-[11px]"
-						>
-							<option value="all">{t('matches.filterTimeAll')}</option>
-							<option value="week">{t('matches.filterTimeWeek')}</option>
-							<option value="month">{t('matches.filterTimeMonth')}</option>
-							<option value="threeMonths">
-								{t('matches.filterTimeThreeMonths')}
-							</option>
-						</select>
+				<div className="space-y-3 pt-2.5 border-t border-slate-900/60">
+					<div className="grid grid-cols-2 gap-3">
+						{/* Periodo Temporale */}
+						<div className="space-y-1">
+							<label className="text-[9px] font-bold uppercase tracking-wider text-slate-500 pl-0.5">
+								{t('matches.filterTimeAll')}
+							</label>
+							<select
+								value={timeFilter}
+								onChange={e => onTimeChange(e.target.value as TimeFilter)}
+								className="select select-xs w-full bg-slate-950 border-none text-slate-300 rounded-xl focus:ring-2 focus:ring-primary/50 focus:outline-none py-1 h-8 text-[11px]"
+							>
+								<option value="all">{t('matches.filterTimeAll')}</option>
+								<option value="week">{t('matches.filterTimeWeek')}</option>
+								<option value="month">{t('matches.filterTimeMonth')}</option>
+								<option value="threeMonths">
+									{t('matches.filterTimeThreeMonths')}
+								</option>
+							</select>
+						</div>
+
+						{/* Formato di Gioco */}
+						<div className="space-y-1">
+							<label className="text-[9px] font-bold uppercase tracking-wider text-slate-500 pl-0.5">
+								{t('matches.filterFormatAll')}
+							</label>
+							<select
+								value={formatFilter}
+								onChange={e => onFormatChange(e.target.value as FormatFilter)}
+								className="select select-xs w-full bg-slate-950 border-none text-slate-300 rounded-xl focus:ring-2 focus:ring-primary/50 focus:outline-none py-1 h-8 text-[11px]"
+							>
+								<option value="all">{t('matches.filterFormatAll')}</option>
+								<option value="3">{t('matches.filterFormat3')}</option>
+								<option value="5">{t('matches.filterFormat5')}</option>
+							</select>
+						</div>
 					</div>
 
-					{/* Formato di Gioco */}
-					<div className="space-y-1">
-						<label className="text-[9px] font-bold uppercase tracking-wider text-slate-500 pl-0.5">
-							{t('matches.filterFormatAll')}
+					{/* Includi anche: contestate / in attesa */}
+					<div className="space-y-1.5">
+						<label className="text-[9px] font-bold uppercase tracking-wider text-slate-500 pl-0.5 block">
+							{t('matches.filterIncludeAlso')}
 						</label>
-						<select
-							value={formatFilter}
-							onChange={e => onFormatChange(e.target.value as FormatFilter)}
-							className="select select-xs w-full bg-slate-950 border-none text-slate-300 rounded-xl focus:ring-2 focus:ring-primary/50 focus:outline-none py-1 h-8 text-[11px]"
-						>
-							<option value="all">{t('matches.filterFormatAll')}</option>
-							<option value="3">{t('matches.filterFormat3')}</option>
-							<option value="5">{t('matches.filterFormat5')}</option>
-						</select>
+						<div className="flex flex-wrap gap-x-4 gap-y-1.5">
+							<label className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
+								<input
+									type="checkbox"
+									checked={includeDisputed}
+									onChange={e => onIncludeDisputedChange(e.target.checked)}
+									className="checkbox checkbox-xs checkbox-error"
+								/>
+								{t('matches.disputedTitle')}
+							</label>
+							<label className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
+								<input
+									type="checkbox"
+									checked={includeWaiting}
+									onChange={e => onIncludeWaitingChange(e.target.checked)}
+									className="checkbox checkbox-xs checkbox-warning"
+								/>
+								{t('matches.waitingOpponent')}
+							</label>
+						</div>
 					</div>
 				</div>
 			)}

@@ -4,11 +4,10 @@ import { dbService, type MatchWithSets } from '../../services/db'
 import { useAppStore } from '../../store/useAppStore'
 import { useDataFetch } from '../../hooks/useDataFetch'
 import { useModalState } from '../../hooks/useModalState'
-import { Pencil, ShieldAlert } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import { getSetsScore } from './matchHelpers'
 import { CorrectionRequestCard } from './CorrectionRequestCard'
 import { PendingConfirmCard } from './PendingConfirmCard'
-import { CompactMatchRow } from './CompactMatchRow'
 import { MatchCard } from './MatchCard'
 import { FilterBar } from './FilterBar'
 import { CorrectionModal } from './CorrectionModal'
@@ -46,6 +45,8 @@ export const MatchesScreen: React.FC = () => {
 	const [typeFilter, setTypeFilter] = useState<'all' | 'ranked' | 'friendly'>('all')
 	const [timeFilter, setTimeFilter] = useState<'all' | 'week' | 'month' | 'threeMonths'>('all')
 	const [formatFilter, setFormatFilter] = useState<'all' | '3' | '5'>('all')
+	const [includeDisputed, setIncludeDisputed] = useState(true)
+	const [includeWaiting, setIncludeWaiting] = useState(true)
 	const [showAdvanced, setShowAdvanced] = useState(false)
 	const [visibleLimit, setVisibleLimit] = useState(10)
 
@@ -157,9 +158,25 @@ export const MatchesScreen: React.FC = () => {
 				m.player_1_id === currentUser?.id ||
 				m.player_2_id === currentUser?.id)
 	)
-	const totalConfirmedCount = matches.filter(m => m.status === 'confirmed').length
-	const filteredConfirmedMatches = matches.filter(match => {
-		if (match.status !== 'confirmed') return false
+	const pendingSentIds = new Set(pendingSent.map(m => m.id))
+
+	const pendingCorrections = matches.filter(
+		m =>
+			m.status === 'confirmed' &&
+			m.correction_status === 'pending' &&
+			m.correction_requested_by !== currentUser?.id &&
+			(m.player_1_id === currentUser?.id || m.player_2_id === currentUser?.id)
+	)
+
+	// Tutto ciò che può comparire nello storico: confermate + contestate + in attesa (le mie)
+	const historyPool = matches.filter(
+		m => m.status === 'confirmed' || m.status === 'disputed' || pendingSentIds.has(m.id)
+	)
+	const totalHistoryCount = historyPool.length
+
+	const filteredMatches = historyPool.filter(match => {
+		if (match.status === 'disputed' && !includeDisputed) return false
+		if (match.status === 'pending' && !includeWaiting) return false
 
 		// 1. Search Query filter (player name/username)
 		if (searchQuery.trim()) {
@@ -184,8 +201,8 @@ export const MatchesScreen: React.FC = () => {
 			return false
 		}
 
-		// 3. Outcome Filter (only when scopeFilter is 'mine')
-		if (scopeFilter === 'mine' && outcomeFilter !== 'all') {
+		// 3. Outcome Filter — ha senso solo per partite confermate (non per contestate/in attesa)
+		if (match.status === 'confirmed' && scopeFilter === 'mine' && outcomeFilter !== 'all') {
 			const { p1, p2 } = getSetsScore(match.sets)
 			const isP1Winner = p1 > p2
 			const iAmP1 = isCurrentUserP1
@@ -220,16 +237,7 @@ export const MatchesScreen: React.FC = () => {
 		return true
 	})
 
-	const slicedConfirmedMatches = filteredConfirmedMatches.slice(0, visibleLimit)
-	const disputedMatches = matches.filter(m => m.status === 'disputed')
-
-	const pendingCorrections = matches.filter(
-		m =>
-			m.status === 'confirmed' &&
-			m.correction_status === 'pending' &&
-			m.correction_requested_by !== currentUser?.id &&
-			(m.player_1_id === currentUser?.id || m.player_2_id === currentUser?.id)
-	)
+	const slicedMatches = filteredMatches.slice(0, visibleLimit)
 
 	const hasActiveFilters =
 		searchQuery !== '' ||
@@ -237,7 +245,9 @@ export const MatchesScreen: React.FC = () => {
 		outcomeFilter !== 'all' ||
 		typeFilter !== 'all' ||
 		timeFilter !== 'all' ||
-		formatFilter !== 'all'
+		formatFilter !== 'all' ||
+		!includeDisputed ||
+		!includeWaiting
 
 	const clearAllFilters = () => {
 		setSearchQuery('')
@@ -246,16 +256,17 @@ export const MatchesScreen: React.FC = () => {
 		setTypeFilter('all')
 		setTimeFilter('all')
 		setFormatFilter('all')
+		setIncludeDisputed(true)
+		setIncludeWaiting(true)
 		setVisibleLimit(10)
 	}
 
 	return (
 		<div className="flex flex-col h-full bg-base-100 text-white">
 			<div className="px-4 pt-6 pb-2">
-				<h2 className="text-xl font-bold tracking-tight text-white mb-1">
+				<h2 className="text-xl font-bold tracking-tight text-white">
 					{t('matches.title')}
 				</h2>
-				<p className="text-xs text-slate-400 font-normal">{t('matches.subtitle')}</p>
 			</div>
 
 			{isLoading ? (
@@ -304,41 +315,23 @@ export const MatchesScreen: React.FC = () => {
 						</div>
 					)}
 
-					{/* In attesa di conferma avversario */}
-					{pendingSent.length > 0 && (
-						<div className="space-y-2">
-							<h3 className="text-xs font-bold uppercase tracking-wider text-warning">
-								{t('matches.waitingOpponent')} ({pendingSent.length})
-							</h3>
-							<div className="space-y-2">
-								{pendingSent.map(match => (
-									<CompactMatchRow
-										key={match.id}
-										match={match}
-										variant="waiting"
-									/>
-								))}
-							</div>
-						</div>
-					)}
-
-					{/* Partite confermate */}
+					{/* Storico partite (confermate + contestate + in attesa, secondo i filtri) */}
 					<div className="space-y-3">
 						<h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
 							<span>
-								{t('matches.confirmedTitle')} ({totalConfirmedCount})
+								{t('matches.confirmedTitle')} ({totalHistoryCount})
 							</span>
-							{filteredConfirmedMatches.length !== totalConfirmedCount && (
+							{filteredMatches.length !== totalHistoryCount && (
 								<span className="text-[10px] text-primary normal-case font-medium">
 									{t('matches.showingMatchesCount', {
-										count: filteredConfirmedMatches.length,
-										total: totalConfirmedCount,
+										count: filteredMatches.length,
+										total: totalHistoryCount,
 									})}
 								</span>
 							)}
 						</h3>
 
-						{totalConfirmedCount > 0 && (
+						{totalHistoryCount > 0 && (
 							<FilterBar
 								searchQuery={searchQuery}
 								onSearchChange={v => {
@@ -371,6 +364,16 @@ export const MatchesScreen: React.FC = () => {
 									setFormatFilter(v)
 									setVisibleLimit(10)
 								}}
+								includeDisputed={includeDisputed}
+								onIncludeDisputedChange={v => {
+									setIncludeDisputed(v)
+									setVisibleLimit(10)
+								}}
+								includeWaiting={includeWaiting}
+								onIncludeWaitingChange={v => {
+									setIncludeWaiting(v)
+									setVisibleLimit(10)
+								}}
 								showAdvanced={showAdvanced}
 								onToggleAdvanced={() => setShowAdvanced(!showAdvanced)}
 								hasActiveFilters={hasActiveFilters}
@@ -378,18 +381,18 @@ export const MatchesScreen: React.FC = () => {
 							/>
 						)}
 
-						{totalConfirmedCount === 0 ? (
+						{totalHistoryCount === 0 ? (
 							<div className="p-8 text-center bg-slate-900/10 rounded-2xl shadow-sm shadow-black/20 text-slate-500 text-sm">
 								{t('matches.confirmedEmpty')}
 							</div>
-						) : filteredConfirmedMatches.length === 0 ? (
+						) : filteredMatches.length === 0 ? (
 							<div className="p-8 text-center bg-slate-900/10 rounded-2xl shadow-sm shadow-black/20 text-slate-500 text-sm">
 								{t('matches.noMatchesFiltered')}
 							</div>
 						) : (
 							<div className="space-y-3.5">
 								<div className="space-y-3">
-									{slicedConfirmedMatches.map(match => (
+									{slicedMatches.map(match => (
 										<MatchCard
 											key={match.id}
 											match={match}
@@ -399,7 +402,7 @@ export const MatchesScreen: React.FC = () => {
 									))}
 								</div>
 
-								{filteredConfirmedMatches.length > visibleLimit && (
+								{filteredMatches.length > visibleLimit && (
 									<div className="flex justify-center pt-2">
 										<button
 											onClick={() => setVisibleLimit(prev => prev + 10)}
@@ -412,25 +415,6 @@ export const MatchesScreen: React.FC = () => {
 							</div>
 						)}
 					</div>
-
-					{/* Partite contestate */}
-					{disputedMatches.length > 0 && (
-						<div className="space-y-2">
-							<h3 className="text-xs font-bold uppercase tracking-wider text-error flex items-center gap-1">
-								<ShieldAlert className="w-4 h-4" /> {t('matches.disputedTitle')} (
-								{disputedMatches.length})
-							</h3>
-							<div className="space-y-2">
-								{disputedMatches.map(match => (
-									<CompactMatchRow
-										key={match.id}
-										match={match}
-										variant="disputed"
-									/>
-								))}
-							</div>
-						</div>
-					)}
 				</div>
 			)}
 

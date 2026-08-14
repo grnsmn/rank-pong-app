@@ -1,9 +1,9 @@
-import React, { useRef, useState } from 'react'
+import React from 'react'
 import { useTranslation } from 'react-i18next'
-import { Calendar, Clock, Pencil, Handshake, Trophy, Info } from 'lucide-react'
+import { Calendar, Clock, Pencil, Handshake, Trophy, ShieldAlert } from 'lucide-react'
 import type { MatchWithSets } from '../../services/db'
 import { getSetsScore, isMyMatch, canRequestCorrection } from './matchHelpers'
-import { useClickOutside } from '../../hooks/useClickOutside'
+import { InfoTooltip } from './InfoTooltip'
 
 interface MatchCardProps {
 	match: MatchWithSets
@@ -18,65 +18,78 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 }) => {
 	const { t } = useTranslation()
 
-	const [showInfo, setShowInfo] = useState(false)
-	const infoRef = useRef<HTMLDivElement>(null)
-	useClickOutside(infoRef, () => setShowInfo(false))
-
 	const { p1, p2 } = getSetsScore(match.sets)
 	const isP1Winner = p1 > p2
 	const iAmRequester = match.correction_requested_by === currentUserId
 	const hasPendingCorrection = match.correction_status === 'pending'
 	const mine = isMyMatch(match, currentUserId)
 
-	const player1NameClass = match.is_friendly
-		? 'text-slate-200'
-		: isP1Winner
+	const isDisputed = match.status === 'disputed'
+	const isAwaitingConfirm = match.status === 'pending'
+	const isSettled = match.status === 'confirmed'
+
+	const showWinnerColor = isSettled && !match.is_friendly
+	const player1NameClass = showWinnerColor
+		? isP1Winner
 			? 'text-yellow-400'
 			: 'text-slate-400'
-	const player2NameClass = match.is_friendly
-		? 'text-slate-200'
-		: !isP1Winner
+		: 'text-slate-200'
+	const player2NameClass = showWinnerColor
+		? !isP1Winner
 			? 'text-yellow-400'
 			: 'text-slate-400'
+		: 'text-slate-200'
+
+	const borderClass = isDisputed
+		? 'shadow-md shadow-error/20 border-error/60'
+		: isAwaitingConfirm
+			? 'shadow-md shadow-warning/10 border-dashed border-warning/50'
+			: match.is_friendly
+				? 'shadow-md shadow-black/20 border-dashed border-emerald-500/40'
+				: 'shadow-lg shadow-primary/20 border-primary/60'
+
+	const typeBadge = match.is_friendly ? (
+		<>
+			<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 text-[9px] font-bold uppercase tracking-wide">
+				<Handshake className="w-2.5 h-2.5" />
+				{t('matches.friendlyBadge')}
+			</span>
+			<InfoTooltip
+				text={t('matches.noRankingImpact')}
+				iconClassName="text-emerald-400/70 hover:text-emerald-300"
+			/>
+		</>
+	) : (
+		<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary text-white shadow-sm shadow-primary/30 text-[9px] font-bold uppercase tracking-wide">
+			<Trophy className="w-2.5 h-2.5" />
+			{t('matches.rankedBadge')}
+		</span>
+	)
 
 	return (
-		<div
-			className={`rounded-2xl bg-neutral/85 overflow-hidden border-2 ${
-				match.is_friendly
-					? 'shadow-md shadow-black/20 border-dashed border-emerald-500/40'
-					: 'shadow-lg shadow-primary/20 border-primary/60'
-			}`}
-		>
+		<div className={`rounded-2xl bg-neutral/85 overflow-hidden border-2 ${borderClass}`}>
 			<div className="px-4 pt-4 pb-3">
 				<div className="flex justify-between items-center text-[10px] text-slate-500 mb-3 border-b border-slate-800 pb-2">
-					<span className="flex items-center gap-2">
-						{match.is_friendly ? (
+					<span className="flex items-center gap-2 flex-wrap">
+						{isDisputed && (
 							<>
-								<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 text-[9px] font-bold uppercase tracking-wide">
-									<Handshake className="w-2.5 h-2.5" />
-									{t('matches.friendlyBadge')}
+								<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-error text-white shadow-sm shadow-error/30 text-[9px] font-bold uppercase tracking-wide">
+									<ShieldAlert className="w-2.5 h-2.5" />
+									{t('matches.disputedBadge')}
 								</span>
-								<div ref={infoRef} className="relative">
-									<button
-										type="button"
-										onClick={() => setShowInfo(prev => !prev)}
-										className="flex items-center text-emerald-400/70 hover:text-emerald-300 transition-colors"
-									>
-										<Info className="w-3.5 h-3.5" />
-									</button>
-									{showInfo && (
-										<div className="absolute z-20 top-full left-0 mt-1.5 w-40 p-2 rounded-lg bg-slate-800 shadow-lg shadow-black/40 text-[10px] leading-snug text-slate-200 normal-case font-normal">
-											{t('matches.noRankingImpact')}
-										</div>
-									)}
-								</div>
+								<InfoTooltip
+									text={t('matches.disputedInfo')}
+									iconClassName="text-error/70 hover:text-error"
+								/>
 							</>
-						) : (
-							<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary text-white shadow-sm shadow-primary/30 text-[9px] font-bold uppercase tracking-wide">
-								<Trophy className="w-2.5 h-2.5" />
-								{t('matches.rankedBadge')}
+						)}
+						{isAwaitingConfirm && (
+							<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning/20 text-warning text-[9px] font-bold uppercase tracking-wide">
+								<Clock className="w-2.5 h-2.5" />
+								{t('matches.waiting')}
 							</span>
 						)}
+						{typeBadge}
 					</span>
 					<span className="flex items-center gap-1">
 						<Calendar className="w-3 h-3" />
@@ -178,7 +191,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 			</div>
 
 			{/* Footer correzione */}
-			{mine && (
+			{mine && isSettled && (
 				<div
 					className={`px-4 py-2.5 ${hasPendingCorrection ? 'bg-orange-950/20' : 'bg-transparent'}`}
 				>

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Calendar, Handshake } from 'lucide-react'
 import type { MatchWithSets } from '../../services/db'
 import { getSetsScore } from './matchHelpers'
+import { InfoTooltip } from './InfoTooltip'
 
 interface PendingConfirmCardProps {
 	match: MatchWithSets
@@ -31,9 +32,6 @@ export const PendingConfirmCard: React.FC<PendingConfirmCardProps> = ({
 		>
 			<div className="flex justify-between items-start mb-2">
 				<div className="flex gap-1.5">
-					<span className="badge badge-primary badge-sm font-extrabold text-[10px] text-white">
-						{t('matches.confirmRequest')}
-					</span>
 					{isArbitrated && (
 						<span className="badge badge-sm font-extrabold text-[10px] bg-purple-600 text-white border-none">
 							{t('matches.arbitratorBadge')}
@@ -76,7 +74,7 @@ export const PendingConfirmCard: React.FC<PendingConfirmCardProps> = ({
 			<div className="bg-slate-950/60 p-3 rounded-xl mb-4 shadow-sm shadow-black/20">
 				<div className="flex justify-between items-center text-sm font-bold mb-2">
 					<span className="text-slate-300">{match.player1?.display_name}</span>
-					<span className="text-primary text-base font-extrabold">
+					<span className="text-white text-base font-extrabold">
 						{p1} - {p2}
 					</span>
 					<span className="text-slate-300">{t('common.you')}</span>
@@ -96,19 +94,26 @@ export const PendingConfirmCard: React.FC<PendingConfirmCardProps> = ({
 				</div>
 			</div>
 
-			<div className="flex gap-2">
-				<button
-					onClick={() => onConfirm(match.id)}
-					className="btn btn-success btn-xs flex-1 text-white font-bold h-8"
-				>
-					{t('matches.approve')}
-				</button>
-				<button
-					onClick={() => onDispute(match.id)}
-					className="btn btn-xs flex-1 h-8 font-bold border-none bg-error/15 text-error hover:bg-error/25"
-				>
-					{t('matches.dispute')}
-				</button>
+			<div className="flex items-center gap-2">
+				<div className="flex gap-2 flex-1">
+					<button
+						onClick={() => onConfirm(match.id)}
+						className="btn btn-success btn-xs flex-1 text-white font-bold h-8"
+					>
+						{t('matches.approve')}
+					</button>
+					<button
+						onClick={() => onDispute(match.id)}
+						className="btn btn-xs flex-1 h-8 font-bold border border-error/40 bg-error/10 text-error hover:bg-error/20 hover:border-error/60"
+					>
+						{t('matches.dispute')}
+					</button>
+				</div>
+				<InfoTooltip
+					text={t('matches.disputedInfo')}
+					iconClassName="text-slate-500 hover:text-slate-300"
+					align="right"
+				/>
 			</div>
 		</div>
 	)

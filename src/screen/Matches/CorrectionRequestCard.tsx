@@ -96,7 +96,7 @@ export const CorrectionRequestCard: React.FC<CorrectionRequestCardProps> = ({
 				</button>
 				<button
 					onClick={() => onReject(match.id)}
-					className="btn btn-sm flex-1 font-bold gap-1 border-none bg-error/15 text-error hover:bg-error/25"
+					className="btn btn-sm flex-1 font-bold gap-1 border border-error/40 bg-error/10 text-error hover:bg-error/20 hover:border-error/60"
 				>
 					<XCircle className="w-3.5 h-3.5" />
 					{t('matches.correctionReject')}
