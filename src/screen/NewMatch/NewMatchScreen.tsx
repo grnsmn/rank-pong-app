@@ -311,7 +311,7 @@ export const NewMatchScreen: React.FC = () => {
 						description={t('newMatch.friendlyToggleDesc')}
 						checked={isFriendly}
 						onChange={() => setIsFriendly(prev => !prev)}
-						accent="sky"
+						accent="emerald"
 					/>
 
 					{isArbitratorMode && (

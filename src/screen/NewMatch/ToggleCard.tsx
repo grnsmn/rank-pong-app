@@ -1,16 +1,16 @@
 import React from 'react'
 import type { LucideIcon } from 'lucide-react'
 
-type Accent = 'purple' | 'sky'
+type Accent = 'purple' | 'emerald'
 
 const ACCENT_STYLES: Record<Accent, { active: string; switchOn: string }> = {
 	purple: {
 		active: 'bg-purple-950/30 text-purple-300 shadow-lg shadow-purple-500/10',
 		switchOn: 'bg-purple-500',
 	},
-	sky: {
-		active: 'bg-sky-950/30 text-sky-300 shadow-lg shadow-sky-500/10',
-		switchOn: 'bg-sky-500',
+	emerald: {
+		active: 'bg-emerald-950/30 text-emerald-300 shadow-lg shadow-emerald-500/10',
+		switchOn: 'bg-emerald-500',
 	},
 }
 
