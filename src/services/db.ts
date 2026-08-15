@@ -29,6 +29,7 @@ export interface Match {
 	created_at: string
 	player1?: Profile
 	player2?: Profile
+	creator?: Profile
 }
 
 export interface SetScore {
@@ -381,7 +382,8 @@ export const dbService = {
 					`
           *,
           player1:player_1_id(*),
-          player2:player_2_id(*)
+          player2:player_2_id(*),
+          creator:created_by(*)
         `
 				)
 				.order('created_at', { ascending: false })
@@ -413,6 +415,7 @@ export const dbService = {
 					correction_status: match.correction_status ?? null,
 					player1: profiles.find(p => p.id === match.player_1_id),
 					player2: profiles.find(p => p.id === match.player_2_id),
+					creator: profiles.find(p => p.id === match.created_by),
 				}))
 				.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 		}

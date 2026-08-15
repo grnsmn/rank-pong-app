@@ -66,13 +66,13 @@ export const PendingConfirmCard: React.FC<PendingConfirmCardProps> = ({
 					{iAmPlayer1 ? (
 						<>
 							<span className="text-sm font-bold text-white">
-								{match.player2?.display_name}
+								{match.creator?.display_name}
 							</span>
 							<span className="text-sm text-slate-400">
 								{t('matches.pendingAsPlayer1')}
 							</span>
 							<span className="text-sm font-bold text-white">
-								{match.player1?.display_name}
+								{match.player2?.display_name}
 							</span>
 						</>
 					) : (
