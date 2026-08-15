@@ -22,6 +22,7 @@ export function useMatchStats(
 		const confirmed = matches.filter(
 			m =>
 				m.status === 'confirmed' &&
+				!m.is_friendly &&
 				(m.player_1_id === playerId || m.player_2_id === playerId)
 		)
 
