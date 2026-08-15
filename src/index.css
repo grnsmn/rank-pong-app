@@ -36,6 +36,15 @@
 	--color-error-content: #0f172a;
 }
 
+.hide-scrollbar {
+	scrollbar-width: none;
+	-ms-overflow-style: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+	display: none;
+}
+
 html,
 body,
 #root {

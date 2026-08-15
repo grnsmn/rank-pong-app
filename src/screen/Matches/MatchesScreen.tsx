@@ -274,7 +274,7 @@ export const MatchesScreen: React.FC = () => {
 					<span className="loading loading-spinner loading-md text-primary"></span>
 				</div>
 			) : (
-				<div className="flex-1 overflow-y-auto px-4 pb-24 space-y-6">
+				<div className="flex-1 overflow-y-auto hide-scrollbar px-4 pb-24 space-y-6">
 					{/* Correzioni da approvare */}
 					{pendingCorrections.length > 0 && (
 						<div className="space-y-2">

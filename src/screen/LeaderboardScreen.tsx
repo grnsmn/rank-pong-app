@@ -102,7 +102,7 @@ export const LeaderboardScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 					<p className="text-sm">{t('leaderboard.empty')}</p>
 				</div>
 			) : (
-				<div className="flex-1 overflow-y-auto px-4 pb-24 space-y-4">
+				<div className="flex-1 overflow-y-auto hide-scrollbar px-4 pb-24 space-y-4">
 					{search === '' && topThree.length > 0 && (
 						<div className="flex justify-center items-end gap-2 pt-10 pb-4 bg-slate-900/40 rounded-2xl border border-slate-800 px-2">
 							{topThree[1] && (

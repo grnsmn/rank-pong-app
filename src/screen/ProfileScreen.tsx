@@ -149,7 +149,7 @@ export const ProfileScreen: React.FC = () => {
 				</div>
 			)}
 
-			<div className="flex-1 overflow-y-auto px-4 pb-24 space-y-5">
+			<div className="flex-1 overflow-y-auto hide-scrollbar px-4 pb-24 space-y-5">
 				{/* --- Card profilo --- */}
 				<div className="p-5 rounded-2xl bg-neutral border border-slate-800 flex flex-col items-center text-center shadow-lg">
 					<div className="relative mb-3">

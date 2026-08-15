@@ -47,7 +47,7 @@ export const PlayerPicker: React.FC<PlayerPickerProps> = ({
 					onFocus={onFocus}
 				/>
 				{showDropdown && (
-					<ul className="absolute z-50 w-full mt-1.5 bg-slate-800 rounded-xl shadow-xl shadow-black/40 max-h-48 overflow-y-auto">
+					<ul className="absolute z-50 w-full mt-1.5 bg-slate-800 rounded-xl shadow-xl shadow-black/40 max-h-48 overflow-y-auto hide-scrollbar">
 						{profiles.length === 0 ? (
 							<li className="px-3 py-2 text-xs text-slate-500">{noResultsLabel}</li>
 						) : (
