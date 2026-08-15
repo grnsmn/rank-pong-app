@@ -45,6 +45,142 @@
 	display: none;
 }
 
+@keyframes pingpong-rally {
+	0% {
+		transform: translate(-44px, 0) scaleY(0.8);
+	}
+	15% {
+		transform: translate(-28px, -14px) scaleY(1);
+	}
+	50% {
+		transform: translate(0, -20px) scaleY(1);
+	}
+	85% {
+		transform: translate(28px, -14px) scaleY(1);
+	}
+	100% {
+		transform: translate(44px, 0) scaleY(0.8);
+	}
+}
+
+@keyframes pingpong-paddle-swing {
+	0%,
+	100% {
+		transform: rotate(0deg);
+	}
+	8% {
+		transform: rotate(-16deg);
+	}
+	20% {
+		transform: rotate(0deg);
+	}
+}
+
+.pingpong-ball {
+	animation: pingpong-rally 0.9s ease-in-out infinite alternate;
+}
+
+.pingpong-paddle {
+	transform-origin: 50% 100%;
+	animation: pingpong-paddle-swing 1.8s ease-in-out infinite;
+}
+
+.pingpong-paddle-right {
+	animation-delay: 0.9s;
+}
+
+@keyframes pingpong-spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.pingpong-ball-spin {
+	animation: pingpong-spin 0.6s linear infinite;
+}
+
+@keyframes pingpong-shadow {
+	0% {
+		transform: translateX(-44px) scaleX(1);
+		opacity: 0.45;
+	}
+	15% {
+		transform: translateX(-28px) scaleX(0.55);
+		opacity: 0.2;
+	}
+	50% {
+		transform: translateX(0) scaleX(0.4);
+		opacity: 0.12;
+	}
+	85% {
+		transform: translateX(28px) scaleX(0.55);
+		opacity: 0.2;
+	}
+	100% {
+		transform: translateX(44px) scaleX(1);
+		opacity: 0.45;
+	}
+}
+
+.pingpong-shadow {
+	animation: pingpong-shadow 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes pingpong-hit-flash {
+	0%,
+	5%,
+	30%,
+	100% {
+		opacity: 0;
+		transform: scale(0.5);
+	}
+	10% {
+		opacity: 0.9;
+		transform: scale(1);
+	}
+	20% {
+		opacity: 0;
+		transform: scale(1.5);
+	}
+}
+
+.pingpong-hit {
+	animation: pingpong-hit-flash 1.8s ease-out infinite;
+}
+
+.pingpong-hit-right {
+	animation-delay: 0.9s;
+}
+
+@keyframes pingpong-hit-text {
+	0%,
+	5%,
+	35%,
+	100% {
+		opacity: 0;
+		transform: translateY(0);
+	}
+	12% {
+		opacity: 1;
+		transform: translateY(-4px);
+	}
+	28% {
+		opacity: 0;
+		transform: translateY(-10px);
+	}
+}
+
+.pingpong-hit-text {
+	animation: pingpong-hit-text 1.8s ease-out infinite;
+}
+
+.pingpong-hit-text-right {
+	animation-delay: 0.9s;
+}
+
 html,
 body,
 #root {

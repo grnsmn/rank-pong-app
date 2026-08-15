@@ -12,6 +12,7 @@ import { MatchesScreen } from './screen/Matches/MatchesScreen'
 import { NewMatchScreen } from './screen/NewMatch/NewMatchScreen'
 import { ProfileScreen } from './screen/ProfileScreen'
 import { PlayerProfileScreen } from './screen/PlayerProfileScreen'
+import { PingPongLoader } from './components/PingPongLoader'
 
 // Icone
 import { Trophy, History, PlusCircle, User, Info } from 'lucide-react'
@@ -66,8 +67,8 @@ export const App: React.FC = () => {
 	if (isLoading) {
 		return (
 			<div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-white">
-				<span className="loading loading-spinner loading-lg text-primary mb-4"></span>
-				<h2 className="text-sm font-bold tracking-widest uppercase text-slate-400">
+				<PingPongLoader />
+				<h2 className="text-sm font-bold tracking-widest uppercase text-slate-400 mt-4">
 					{t('app.loading')}
 				</h2>
 			</div>
