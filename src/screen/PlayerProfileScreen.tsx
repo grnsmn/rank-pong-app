@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { dbService, type Profile } from '../services/db'
 import { useDataFetch } from '../hooks/useDataFetch'
 import { useMatchStats } from '../hooks/useMatchStats'
-import { ArrowLeft, User, Percent, Flame, Calendar, Trophy } from 'lucide-react'
+import { ArrowLeft, User, Percent, Flame, Calendar, Trophy, Handshake } from 'lucide-react'
 
 interface Props {
 	playerId: string
@@ -229,6 +229,7 @@ export const PlayerProfileScreen: React.FC<Props> = ({ playerId, onBack }) => {
 
 								const date = new Date(match.created_at)
 								const dateStr = `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`
+								const isFriendly = match.is_friendly
 
 								return (
 									<div
@@ -237,7 +238,7 @@ export const PlayerProfileScreen: React.FC<Props> = ({ playerId, onBack }) => {
 									>
 										<div className="flex items-center gap-3 min-w-0">
 											<div
-												className={`w-1.5 h-8 rounded-full shrink-0 ${won ? 'bg-success' : 'bg-error'}`}
+												className={`w-1.5 h-8 rounded-full shrink-0 ${isFriendly ? 'bg-emerald-500/60' : won ? 'bg-success' : 'bg-error'}`}
 											/>
 											<div className="min-w-0">
 												<div className="text-xs font-bold text-slate-300 truncate">
@@ -252,17 +253,24 @@ export const PlayerProfileScreen: React.FC<Props> = ({ playerId, onBack }) => {
 										</div>
 										<div className="flex flex-col items-end shrink-0 gap-1">
 											<span
-												className={`text-xs font-extrabold ${won ? 'text-success' : 'text-error'}`}
+												className={`text-xs font-extrabold ${isFriendly ? 'text-slate-200' : won ? 'text-success' : 'text-error'}`}
 											>
 												{playerSets}–{opponentSets}
 											</span>
-											<span
-												className={`badge badge-xs font-bold uppercase text-white ${won ? 'badge-success' : 'badge-error'}`}
-											>
-												{won
-													? t('playerProfile.matchWon')
-													: t('playerProfile.matchLost')}
-											</span>
+											{isFriendly ? (
+												<span className="badge badge-xs font-bold uppercase text-white bg-emerald-600 border-none gap-1">
+													<Handshake className="w-2 h-2" />
+													{t('matches.friendlyBadge')}
+												</span>
+											) : (
+												<span
+													className={`badge badge-xs font-bold uppercase text-white ${won ? 'badge-success' : 'badge-error'}`}
+												>
+													{won
+														? t('playerProfile.matchWon')
+														: t('playerProfile.matchLost')}
+												</span>
+											)}
 										</div>
 									</div>
 								)
