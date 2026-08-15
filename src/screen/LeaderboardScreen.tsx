@@ -30,7 +30,7 @@ export const LeaderboardScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 		switch (type) {
 			case 'competitive':
 				return (
-					<span className="badge badge-error badge-xs text-white uppercase font-bold py-1.5 px-2">
+					<span className="badge badge-xs bg-violet-500 border-violet-500 text-white uppercase font-bold py-1.5 px-2">
 						{t('playerType.competitive')}
 					</span>
 				)
@@ -42,7 +42,7 @@ export const LeaderboardScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 				)
 			default:
 				return (
-					<span className="badge badge-success badge-xs text-white uppercase font-bold py-1.5 px-2">
+					<span className="badge badge-xs bg-sky-500 border-sky-500 text-white uppercase font-bold py-1.5 px-2">
 						{t('playerType.amateur')}
 					</span>
 				)
