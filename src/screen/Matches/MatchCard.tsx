@@ -4,6 +4,7 @@ import { Calendar, Clock, Pencil, Handshake, Trophy, ShieldAlert } from 'lucide-
 import type { MatchWithSets } from '../../services/db'
 import { getSetsScore, isMyMatch, canRequestCorrection } from './matchHelpers'
 import { InfoTooltip } from '../../components/InfoTooltip'
+import { SetScoreRow } from './SetScoreRow'
 
 interface MatchCardProps {
 	match: MatchWithSets
@@ -23,12 +24,14 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 	const iAmRequester = match.correction_requested_by === currentUserId
 	const hasPendingCorrection = match.correction_status === 'pending'
 	const mine = isMyMatch(match, currentUserId)
+	const mySide: 'p1' | 'p2' = mine && currentUserId === match.player_2_id ? 'p2' : 'p1'
 
 	const isDisputed = match.status === 'disputed'
 	const isAwaitingConfirm = match.status === 'pending'
 	const isSettled = match.status === 'confirmed'
 
 	const showWinnerColor = isSettled && !match.is_friendly
+	const showSetOutcome = isSettled
 	const player1NameClass = showWinnerColor
 		? isP1Winner
 			? 'text-yellow-400'
@@ -40,13 +43,20 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 			: 'text-slate-400'
 		: 'text-slate-200'
 
-	const borderClass = isDisputed
-		? 'shadow-md shadow-error/20 border-error/60'
+	const statusAccent = isDisputed
+		? 'error'
 		: isAwaitingConfirm
-			? 'shadow-md shadow-warning/10 border-dashed border-warning/50'
+			? 'warning'
 			: match.is_friendly
-				? 'shadow-md shadow-black/20 border-dashed border-emerald-500/40'
-				: 'shadow-lg shadow-primary/20 border-primary/60'
+				? 'friendly'
+				: 'primary'
+
+	const borderClass = {
+		error: 'shadow-md shadow-error/20 border-error/60',
+		warning: 'shadow-md shadow-warning/10 border-dashed border-warning/50',
+		friendly: 'shadow-md shadow-black/20 border-dashed border-emerald-500/40',
+		primary: 'shadow-lg shadow-primary/20 border-primary/60',
+	}[statusAccent]
 
 	const typeBadge = match.is_friendly ? (
 		<>
@@ -104,7 +114,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 
 				<div className="grid grid-cols-7 items-center mb-3">
 					<div className="col-span-2 flex flex-col items-center text-center">
-						<div className="w-10 h-10 rounded-full overflow-hidden bg-slate-800 border border-slate-700 mb-1 flex items-center justify-center shrink-0">
+						<div className="w-14 h-14 rounded-full overflow-hidden bg-slate-800 border border-slate-700 mb-1 flex items-center justify-center shrink-0">
 							{match.player1?.avatar_url ? (
 								<img
 									src={match.player1.avatar_url}
@@ -112,19 +122,19 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 									className="w-full h-full object-cover"
 								/>
 							) : (
-								<span className="text-xs font-extrabold">
+								<span className="text-sm font-extrabold">
 									{match.player1?.display_name.substring(0, 2)}
 								</span>
 							)}
 						</div>
 						<span
-							className={`text-[10px] truncate max-w-full font-bold ${player1NameClass}`}
+							className={`text-sm truncate max-w-full font-bold ${player1NameClass}`}
 						>
 							{match.player1?.display_name}
 						</span>
 						{match.elo_change_p1 !== null && (
 							<span
-								className={`text-[10px] font-extrabold mt-0.5 ${match.elo_change_p1 >= 0 ? 'text-success' : 'text-error'}`}
+								className={`text-xs font-extrabold mt-0.5 ${match.elo_change_p1 >= 0 ? 'text-success' : 'text-error'}`}
 							>
 								{match.elo_change_p1 >= 0
 									? `+${match.elo_change_p1}`
@@ -135,16 +145,13 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 					</div>
 
 					<div className="col-span-3 flex flex-col items-center justify-center">
-						<span className="text-xl font-black text-white bg-slate-950 px-4 py-1 rounded-xl shadow-sm shadow-black/20">
+						<span className="text-2xl font-black text-white bg-slate-950 px-4 py-1 rounded-xl shadow-sm shadow-black/20">
 							{p1} - {p2}
-						</span>
-						<span className="text-[9px] text-slate-500 mt-1 uppercase font-semibold">
-							{t('common.bestOf')} {match.best_of}
 						</span>
 					</div>
 
 					<div className="col-span-2 flex flex-col items-center text-center">
-						<div className="w-10 h-10 rounded-full overflow-hidden bg-slate-800 border border-slate-700 mb-1 flex items-center justify-center shrink-0">
+						<div className="w-14 h-14 rounded-full overflow-hidden bg-slate-800 border border-slate-700 mb-1 flex items-center justify-center shrink-0">
 							{match.player2?.avatar_url ? (
 								<img
 									src={match.player2.avatar_url}
@@ -152,19 +159,19 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 									className="w-full h-full object-cover"
 								/>
 							) : (
-								<span className="text-xs font-extrabold">
+								<span className="text-sm font-extrabold">
 									{match.player2?.display_name.substring(0, 2)}
 								</span>
 							)}
 						</div>
 						<span
-							className={`text-[10px] truncate max-w-full font-bold ${player2NameClass}`}
+							className={`text-md truncate max-w-full font-bold ${player2NameClass}`}
 						>
 							{match.player2?.display_name}
 						</span>
 						{match.elo_change_p2 !== null && (
 							<span
-								className={`text-[10px] font-extrabold mt-0.5 ${match.elo_change_p2 >= 0 ? 'text-success' : 'text-error'}`}
+								className={`text-xs font-extrabold mt-0.5 ${match.elo_change_p2 >= 0 ? 'text-success' : 'text-error'}`}
 							>
 								{match.elo_change_p2 >= 0
 									? `+${match.elo_change_p2}`
@@ -175,19 +182,12 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 					</div>
 				</div>
 
-				<div className="flex gap-1.5 justify-center mt-3 pt-2.5 border-t border-slate-800/40 text-[10px] text-slate-400">
-					{match.sets.map((set, idx) => (
-						<span
-							key={set.id}
-							className="bg-slate-950 px-2.5 py-1 rounded-md font-mono"
-						>
-							{t('common.set')} {idx + 1}:{' '}
-							<strong className="text-slate-200">
-								{set.score_p1}-{set.score_p2}
-							</strong>
-						</span>
-					))}
-				</div>
+				<SetScoreRow
+					sets={match.sets}
+					showOutcome={showSetOutcome}
+					mySide={mySide}
+					isFriendly={match.is_friendly}
+				/>
 			</div>
 
 			{/* Footer correzione */}
