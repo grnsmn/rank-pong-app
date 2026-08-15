@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Calendar, Handshake } from 'lucide-react'
 import type { MatchWithSets } from '../../services/db'
 import { getSetsScore } from './matchHelpers'
-import { InfoTooltip } from './InfoTooltip'
+import { InfoTooltip } from '../../components/InfoTooltip'
 
 interface PendingConfirmCardProps {
 	match: MatchWithSets

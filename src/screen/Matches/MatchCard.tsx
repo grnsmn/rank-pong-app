@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Calendar, Clock, Pencil, Handshake, Trophy, ShieldAlert } from 'lucide-react'
 import type { MatchWithSets } from '../../services/db'
 import { getSetsScore, isMyMatch, canRequestCorrection } from './matchHelpers'
-import { InfoTooltip } from './InfoTooltip'
+import { InfoTooltip } from '../../components/InfoTooltip'
 
 interface MatchCardProps {
 	match: MatchWithSets

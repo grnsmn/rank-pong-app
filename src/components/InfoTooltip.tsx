@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react'
 import { Info } from 'lucide-react'
-import { useClickOutside } from '../../hooks/useClickOutside'
+import { useClickOutside } from '../hooks/useClickOutside'
 
 interface InfoTooltipProps {
 	text: string

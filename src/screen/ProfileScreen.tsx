@@ -17,6 +17,7 @@ import {
 	Check,
 	ChevronDown,
 } from 'lucide-react'
+import { InfoTooltip } from '../components/InfoTooltip'
 
 // ---------------------------------------------------------------------------
 // Tipi locali
@@ -338,6 +339,7 @@ export const ProfileScreen: React.FC = () => {
 								<span className="text-slate-500 font-bold text-[10px] uppercase flex items-center gap-1.5">
 									<Calendar className="w-3.5 h-3.5 text-primary" />{' '}
 									{t('profile.matches')}
+									<InfoTooltip text={t('profile.matchesInfo')} />
 								</span>
 								<div className="mt-2.5">
 									<span className="text-2xl font-black text-white">
@@ -353,6 +355,7 @@ export const ProfileScreen: React.FC = () => {
 								<span className="text-slate-500 font-bold text-[10px] uppercase flex items-center gap-1.5">
 									<Percent className="w-3.5 h-3.5 text-success" />{' '}
 									{t('profile.winRate')}
+									<InfoTooltip text={t('profile.winRateInfo')} align="right" />
 								</span>
 								<div className="mt-2.5">
 									<span className="text-2xl font-black text-success">
@@ -368,6 +371,7 @@ export const ProfileScreen: React.FC = () => {
 								<span className="text-slate-500 font-bold text-[10px] uppercase flex items-center gap-1.5">
 									<Trophy className="w-3.5 h-3.5 text-amber-500" />{' '}
 									{t('profile.setRatio')}
+									<InfoTooltip text={t('profile.setRatioInfo')} />
 								</span>
 								<div className="mt-2.5">
 									<span className="text-2xl font-black text-amber-500">
@@ -384,6 +388,7 @@ export const ProfileScreen: React.FC = () => {
 								<span className="text-slate-500 font-bold text-[10px] uppercase flex items-center gap-1.5">
 									<Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-500/10" />{' '}
 									{t('profile.streak')}
+									<InfoTooltip text={t('profile.streakInfo')} align="right" />
 								</span>
 								<div className="mt-2.5">
 									<span className="text-2xl font-black text-orange-500">
