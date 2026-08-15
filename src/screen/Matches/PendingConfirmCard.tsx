@@ -10,6 +10,7 @@ interface PendingConfirmCardProps {
 	currentUserId: string | undefined
 	onConfirm: (matchId: string) => void
 	onDispute: (matchId: string) => void
+	onPlayerSelect?: (playerId: string) => void
 }
 
 export const PendingConfirmCard: React.FC<PendingConfirmCardProps> = ({
@@ -17,6 +18,7 @@ export const PendingConfirmCard: React.FC<PendingConfirmCardProps> = ({
 	currentUserId,
 	onConfirm,
 	onDispute,
+	onPlayerSelect,
 }) => {
 	const { t } = useTranslation()
 
@@ -25,6 +27,7 @@ export const PendingConfirmCard: React.FC<PendingConfirmCardProps> = ({
 	const isArbitrated = match.created_by !== match.player_1_id
 
 	const opponentName = iAmPlayer1 ? match.player2?.display_name : match.player1?.display_name
+	const opponentId = iAmPlayer1 ? match.player2?.id : match.player1?.id
 	const myScore = iAmPlayer1 ? p1 : p2
 	const opponentScore = iAmPlayer1 ? p2 : p1
 	const didIWin = myScore > opponentScore
@@ -65,19 +68,34 @@ export const PendingConfirmCard: React.FC<PendingConfirmCardProps> = ({
 				<div className="flex flex-wrap items-baseline gap-x-1.5 bg-slate-900 px-3 pt-3 pb-2.5">
 					{iAmPlayer1 ? (
 						<>
-							<span className="text-sm font-bold text-white">
+							<span
+								className="text-sm font-bold text-white cursor-pointer hover:underline"
+								onClick={() =>
+									match.creator?.id && onPlayerSelect?.(match.creator.id)
+								}
+							>
 								{match.creator?.display_name}
 							</span>
 							<span className="text-sm text-slate-400">
 								{t('matches.pendingAsPlayer1')}
 							</span>
-							<span className="text-sm font-bold text-white">
+							<span
+								className="text-sm font-bold text-white cursor-pointer hover:underline"
+								onClick={() =>
+									match.player2?.id && onPlayerSelect?.(match.player2.id)
+								}
+							>
 								{match.player2?.display_name}
 							</span>
 						</>
 					) : (
 						<>
-							<span className="text-sm font-bold text-white">
+							<span
+								className="text-sm font-bold text-white cursor-pointer hover:underline"
+								onClick={() =>
+									match.player1?.id && onPlayerSelect?.(match.player1.id)
+								}
+							>
 								{match.player1?.display_name}
 							</span>
 							<span className="text-sm text-slate-400">
@@ -102,7 +120,12 @@ export const PendingConfirmCard: React.FC<PendingConfirmCardProps> = ({
 				)}
 				<div className="bg-slate-950/60 p-3">
 					<div className="flex justify-between items-center text-sm font-bold mb-2">
-						<span className="text-slate-300">{opponentName}</span>
+						<span
+							className="text-slate-300 cursor-pointer hover:underline"
+							onClick={() => opponentId && onPlayerSelect?.(opponentId)}
+						>
+							{opponentName}
+						</span>
 						<span className="text-white text-base font-extrabold">
 							{opponentScore} - {myScore}
 						</span>

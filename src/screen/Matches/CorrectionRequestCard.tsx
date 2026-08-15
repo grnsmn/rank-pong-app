@@ -8,12 +8,14 @@ interface CorrectionRequestCardProps {
 	match: MatchWithSets
 	onApprove: (matchId: string) => void
 	onReject: (matchId: string) => void
+	onPlayerSelect?: (playerId: string) => void
 }
 
 export const CorrectionRequestCard: React.FC<CorrectionRequestCardProps> = ({
 	match,
 	onApprove,
 	onReject,
+	onPlayerSelect,
 }) => {
 	const { t } = useTranslation()
 
@@ -47,7 +49,12 @@ export const CorrectionRequestCard: React.FC<CorrectionRequestCardProps> = ({
 			</div>
 
 			<p className="text-sm mb-3">
-				<span className="font-extrabold text-slate-200">{opponent?.display_name}</span>{' '}
+				<span
+					className="font-extrabold text-slate-200 cursor-pointer hover:underline"
+					onClick={() => opponent?.id && onPlayerSelect?.(opponent.id)}
+				>
+					{opponent?.display_name}
+				</span>{' '}
 				{t('matches.correctionIntro')}
 			</p>
 

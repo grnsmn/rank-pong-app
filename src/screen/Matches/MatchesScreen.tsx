@@ -17,7 +17,11 @@ interface CorrectionModalData {
 	sets: { score_p1: string; score_p2: string }[]
 }
 
-export const MatchesScreen: React.FC = () => {
+interface Props {
+	onPlayerSelect?: (playerId: string) => void
+}
+
+export const MatchesScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 	const { t } = useTranslation()
 	const { currentUser, refreshProfile } = useAppStore()
 
@@ -289,6 +293,7 @@ export const MatchesScreen: React.FC = () => {
 										match={match}
 										onApprove={handleApproveCorrection}
 										onReject={handleRejectCorrection}
+										onPlayerSelect={onPlayerSelect}
 									/>
 								))}
 							</div>
@@ -309,6 +314,7 @@ export const MatchesScreen: React.FC = () => {
 										currentUserId={currentUser?.id}
 										onConfirm={handleConfirm}
 										onDispute={handleDispute}
+										onPlayerSelect={onPlayerSelect}
 									/>
 								))}
 							</div>
@@ -398,6 +404,7 @@ export const MatchesScreen: React.FC = () => {
 											match={match}
 											currentUserId={currentUser?.id}
 											onRequestCorrection={openCorrectionModal}
+											onPlayerSelect={onPlayerSelect}
 										/>
 									))}
 								</div>

@@ -79,7 +79,6 @@ const it = {
 		subtitle: 'Calcolo ranking in tempo reale basato su algoritmo Elo',
 		searchPlaceholder: 'Cerca giocatore...',
 		empty: 'Nessun giocatore registrato o trovato.',
-		rankingPoints: 'punti ranking',
 	},
 	matches: {
 		title: 'Partite e Richieste',

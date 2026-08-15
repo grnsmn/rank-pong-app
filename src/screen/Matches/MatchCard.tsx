@@ -10,12 +10,14 @@ interface MatchCardProps {
 	match: MatchWithSets
 	currentUserId: string | undefined
 	onRequestCorrection: (match: MatchWithSets) => void
+	onPlayerSelect?: (playerId: string) => void
 }
 
 export const MatchCard: React.FC<MatchCardProps> = ({
 	match,
 	currentUserId,
 	onRequestCorrection,
+	onPlayerSelect,
 }) => {
 	const { t } = useTranslation()
 
@@ -113,7 +115,10 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 				</div>
 
 				<div className="grid grid-cols-7 items-center mb-3">
-					<div className="col-span-2 flex flex-col items-center text-center">
+					<div
+						className="col-span-2 flex flex-col items-center text-center cursor-pointer"
+						onClick={() => match.player1 && onPlayerSelect?.(match.player1.id)}
+					>
 						<div className="w-14 h-14 rounded-full overflow-hidden bg-slate-800 border border-slate-700 mb-1 flex items-center justify-center shrink-0">
 							{match.player1?.avatar_url ? (
 								<img
@@ -150,7 +155,10 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 						</span>
 					</div>
 
-					<div className="col-span-2 flex flex-col items-center text-center">
+					<div
+						className="col-span-2 flex flex-col items-center text-center cursor-pointer"
+						onClick={() => match.player2 && onPlayerSelect?.(match.player2.id)}
+					>
 						<div className="w-14 h-14 rounded-full overflow-hidden bg-slate-800 border border-slate-700 mb-1 flex items-center justify-center shrink-0">
 							{match.player2?.avatar_url ? (
 								<img

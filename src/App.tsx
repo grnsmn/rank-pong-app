@@ -98,7 +98,7 @@ export const App: React.FC = () => {
 			case 'leaderboard':
 				return <LeaderboardScreen onPlayerSelect={id => setSelectedPlayerId(id)} />
 			case 'matches':
-				return <MatchesScreen />
+				return <MatchesScreen onPlayerSelect={id => setSelectedPlayerId(id)} />
 			case 'new-match':
 				return <NewMatchScreen />
 			case 'profile':

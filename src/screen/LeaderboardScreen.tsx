@@ -4,6 +4,8 @@ import { dbService, type Profile } from '../services/db'
 import { useDataFetch } from '../hooks/useDataFetch'
 import { useSearch } from '../hooks/useSearch'
 import { Trophy, Medal, Search, User } from 'lucide-react'
+import { TruncatedName } from './Leaderboard/TruncatedName'
+import { PodiumSection } from './Leaderboard/PodiumSection'
 
 interface Props {
 	onPlayerSelect?: (playerId: string) => void
@@ -26,23 +28,23 @@ export const LeaderboardScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 		(p, q) => p.display_name.toLowerCase().includes(q) || p.username.toLowerCase().includes(q)
 	)
 
-	const getPlayerTypeBadge = (type: string) => {
+	const getPlayerTypeLabel = (type: string) => {
 		switch (type) {
 			case 'competitive':
 				return (
-					<span className="badge badge-xs bg-violet-500 border-violet-500 text-white uppercase font-bold py-1.5 px-2">
+					<span className="text-[9px] uppercase font-bold tracking-wide text-violet-400">
 						{t('playerType.competitive')}
 					</span>
 				)
 			case 'student':
 				return (
-					<span className="badge badge-info badge-xs text-white uppercase font-bold py-1.5 px-2">
+					<span className="text-[9px] uppercase font-bold tracking-wide text-info">
 						{t('playerType.student')}
 					</span>
 				)
 			default:
 				return (
-					<span className="badge badge-xs bg-sky-500 border-sky-500 text-white uppercase font-bold py-1.5 px-2">
+					<span className="text-[9px] uppercase font-bold tracking-wide text-sky-400">
 						{t('playerType.amateur')}
 					</span>
 				)
@@ -104,109 +106,7 @@ export const LeaderboardScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 			) : (
 				<div className="flex-1 overflow-y-auto hide-scrollbar px-4 pb-24 space-y-4">
 					{search === '' && topThree.length > 0 && (
-						<div className="flex justify-center items-end gap-2 pt-10 pb-4 bg-slate-900/40 rounded-2xl border border-slate-800 px-2">
-							{topThree[1] && (
-								<div
-									className="flex flex-col items-center w-1/3 cursor-pointer"
-									onClick={() => onPlayerSelect?.(topThree[1].id)}
-								>
-									<div className="relative">
-										<div className="w-12 h-12 rounded-full border-2 border-slate-300 overflow-hidden bg-slate-800 flex items-center justify-center">
-											{topThree[1].avatar_url ? (
-												<img
-													src={topThree[1].avatar_url}
-													alt=""
-													className="w-full h-full object-cover"
-												/>
-											) : (
-												<User className="w-6 h-6 text-slate-500" />
-											)}
-										</div>
-										<span className="absolute -bottom-1 -right-1 badge badge-neutral border-slate-400 badge-sm font-extrabold text-slate-300 w-5 h-5 p-0 flex items-center justify-center">
-											2
-										</span>
-									</div>
-									<span className="text-xs font-bold text-slate-200 mt-2 truncate max-w-full">
-										{topThree[1].display_name.split(' ')[0]}
-									</span>
-									<span className="text-[10px] text-slate-400 truncate max-w-full">
-										@{topThree[1].username}
-									</span>
-									<div className="badge badge-neutral mt-1 text-slate-300 font-extrabold text-xs px-2 py-0.5">
-										{topThree[1].elo_rating}
-									</div>
-								</div>
-							)}
-
-							{topThree[0] && (
-								<div
-									className="flex flex-col items-center w-1/3 z-10 -translate-y-2 cursor-pointer"
-									onClick={() => onPlayerSelect?.(topThree[0].id)}
-								>
-									<div className="relative">
-										<div className="absolute -top-5 left-1/2 -translate-x-1/2">
-											<Trophy className="w-6 h-6 text-yellow-400" />
-										</div>
-										<div className="w-16 h-16 rounded-full border-4 border-yellow-400 overflow-hidden bg-slate-800 flex items-center justify-center shadow-lg shadow-yellow-500/10">
-											{topThree[0].avatar_url ? (
-												<img
-													src={topThree[0].avatar_url}
-													alt=""
-													className="w-full h-full object-cover"
-												/>
-											) : (
-												<User className="w-8 h-8 text-yellow-500" />
-											)}
-										</div>
-										<span className="absolute -bottom-1 -right-1 badge badge-warning badge-sm font-extrabold text-white w-6 h-6 p-0 flex items-center justify-center">
-											1
-										</span>
-									</div>
-									<span className="text-sm font-extrabold text-yellow-400 mt-2 truncate max-w-full">
-										{topThree[0].display_name.split(' ')[0]}
-									</span>
-									<span className="text-[10px] text-slate-300 truncate max-w-full">
-										@{topThree[0].username}
-									</span>
-									<div className="badge badge-neutral mt-1 text-yellow-400 font-extrabold text-xs px-2 py-0.5">
-										{topThree[0].elo_rating}
-									</div>
-								</div>
-							)}
-
-							{topThree[2] && (
-								<div
-									className="flex flex-col items-center w-1/3 cursor-pointer"
-									onClick={() => onPlayerSelect?.(topThree[2].id)}
-								>
-									<div className="relative">
-										<div className="w-12 h-12 rounded-full border-2 border-amber-600 overflow-hidden bg-slate-800 flex items-center justify-center">
-											{topThree[2].avatar_url ? (
-												<img
-													src={topThree[2].avatar_url}
-													alt=""
-													className="w-full h-full object-cover"
-												/>
-											) : (
-												<User className="w-6 h-6 text-slate-500" />
-											)}
-										</div>
-										<span className="absolute -bottom-1 -right-1 badge badge-neutral border-amber-600 badge-sm font-extrabold text-amber-600 w-5 h-5 p-0 flex items-center justify-center">
-											3
-										</span>
-									</div>
-									<span className="text-xs font-bold text-slate-200 mt-2 truncate max-w-full">
-										{topThree[2].display_name.split(' ')[0]}
-									</span>
-									<span className="text-[10px] text-slate-400 truncate max-w-full">
-										@{topThree[2].username}
-									</span>
-									<div className="badge badge-neutral mt-1 text-slate-300 font-extrabold text-xs px-2 py-0.5">
-										{topThree[2].elo_rating}
-									</div>
-								</div>
-							)}
-						</div>
+						<PodiumSection topThree={topThree} onPlayerSelect={onPlayerSelect} />
 					)}
 
 					<div className="bg-slate-900/20 rounded-2xl border border-slate-800 divide-y divide-slate-800/80 overflow-hidden">
@@ -234,24 +134,22 @@ export const LeaderboardScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 											)}
 										</div>
 										<div className="min-w-0">
-											<div className="flex items-center gap-1.5">
-												<span className="text-sm font-bold text-slate-200 truncate">
-													{player.display_name}
-												</span>
-												{getPlayerTypeBadge(player.player_type)}
-											</div>
-											<div className="text-[10px] text-slate-400 truncate">
-												@{player.username} • {player.age}{' '}
-												{t('common.years')}
-											</div>
+											<TruncatedName
+												text={player.display_name}
+												className="text-sm font-bold text-slate-200"
+												block
+											/>
+											<TruncatedName
+												text={`@${player.username}`}
+												className="text-[10px] text-slate-400"
+												block
+											/>
 										</div>
 									</div>
 									<div className="flex flex-col items-end shrink-0">
+										{getPlayerTypeLabel(player.player_type)}
 										<span className="text-sm font-extrabold text-primary">
 											{player.elo_rating} {t('common.elo')}
-										</span>
-										<span className="text-[9px] text-slate-500">
-											{t('leaderboard.rankingPoints')}
 										</span>
 									</div>
 								</div>
