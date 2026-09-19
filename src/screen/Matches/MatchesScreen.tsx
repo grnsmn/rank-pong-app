@@ -30,7 +30,9 @@ export const MatchesScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 		isLoading,
 		refetch: fetchMatches,
 	} = useDataFetch(() => dbService.getMatches(), { refetchOnFocus: true })
-	const matches = data ?? []
+	// Le partite registrate dentro un evento si gestiscono nel dettaglio
+	// dell'edizione: qui resterebbero solo a fare rumore.
+	const matches = (data ?? []).filter(m => !m.event_id)
 
 	const {
 		modalData: correctionModal,

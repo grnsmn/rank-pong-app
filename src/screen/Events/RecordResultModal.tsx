@@ -75,11 +75,11 @@ export const RecordResultModal: React.FC<Props> = ({
 					<div className="flex items-center gap-2 mb-1.5">
 						<Swords className="w-4 h-4 text-indigo-400 shrink-0" />
 						<h3 className="text-base font-bold text-white">{t('events.register')}</h3>
-						<span className="badge badge-sm font-extrabold text-[9px] bg-indigo-600 text-white border-none">
+						<span className="badge badge-sm font-extrabold text-[10px] bg-indigo-600 text-white border-none">
 							BO{bestOf}
 						</span>
 					</div>
-					<p className="text-xs text-slate-400 leading-relaxed">
+					<p className="text-[13px] text-slate-400 leading-relaxed">
 						{slot.player1?.display_name} vs {slot.player2?.display_name}
 					</p>
 				</div>
@@ -87,11 +87,11 @@ export const RecordResultModal: React.FC<Props> = ({
 				<div className="px-6 py-5 space-y-3">
 					<div className="grid grid-cols-[3rem_1fr_1rem_1fr] items-center gap-2 mb-1">
 						<span />
-						<span className="text-center text-[10px] text-slate-500 font-bold uppercase truncate">
+						<span className="text-center text-[11px] text-slate-500 font-bold uppercase truncate">
 							{slot.player1?.display_name}
 						</span>
 						<span />
-						<span className="text-center text-[10px] text-slate-500 font-bold uppercase truncate">
+						<span className="text-center text-[11px] text-slate-500 font-bold uppercase truncate">
 							{slot.player2?.display_name}
 						</span>
 					</div>
@@ -101,7 +101,7 @@ export const RecordResultModal: React.FC<Props> = ({
 							key={index}
 							className="grid grid-cols-[3rem_1fr_1rem_1fr] items-center gap-2"
 						>
-							<span className="text-[10px] text-slate-500 font-mono text-center">
+							<span className="text-[11px] text-slate-500 font-mono text-center">
 								{t('common.set')} {index + 1}
 							</span>
 							<input
@@ -112,7 +112,9 @@ export const RecordResultModal: React.FC<Props> = ({
 								onChange={e => setScore(index, 1, e.target.value)}
 								className="input input-sm w-full text-center bg-slate-800 border-none text-white focus:ring-2 focus:ring-indigo-400/50 focus:outline-none"
 							/>
-							<span className="text-center text-slate-500 font-bold text-xs">–</span>
+							<span className="text-center text-slate-500 font-bold text-[13px]">
+								–
+							</span>
 							<input
 								type="text"
 								pattern="\d*"
@@ -130,7 +132,7 @@ export const RecordResultModal: React.FC<Props> = ({
 								onClick={() =>
 									setRows(prev => [...prev, { score1: '', score2: '' }])
 								}
-								className="btn btn-sm flex-1 text-xs font-bold border-none bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/25"
+								className="btn btn-sm flex-1 text-[13px] font-bold border-none bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/25"
 							>
 								{t('newMatch.nextSet')}
 							</button>
@@ -138,14 +140,14 @@ export const RecordResultModal: React.FC<Props> = ({
 						{rows.length > 1 && (
 							<button
 								onClick={() => setRows(prev => prev.slice(0, -1))}
-								className="btn btn-sm text-xs font-bold w-12 border-none bg-error/15 text-error hover:bg-error/25"
+								className="btn btn-sm text-[13px] font-bold w-12 border-none bg-error/15 text-error hover:bg-error/25"
 							>
 								{t('newMatch.removeSet')}
 							</button>
 						)}
 					</div>
 
-					{error && <p className="text-xs text-error text-center pt-1">{error}</p>}
+					{error && <p className="text-[13px] text-error text-center pt-1">{error}</p>}
 				</div>
 
 				<div className="px-6 pb-6 flex gap-3">

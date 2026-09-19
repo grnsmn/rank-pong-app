@@ -54,7 +54,7 @@ export const EventFilterBar: React.FC<Props> = ({
 					value={search}
 					onChange={e => onSearchChange(e.target.value)}
 					placeholder={t('events.searchPlaceholder')}
-					className="input input-sm pl-8.5 pr-8 w-full bg-slate-950 border-none text-white rounded-xl focus:ring-2 focus:ring-indigo-400/50 focus:outline-none placeholder-slate-500 text-xs h-8"
+					className="input input-sm pl-8.5 pr-8 w-full bg-slate-950 border-none text-white rounded-xl focus:ring-2 focus:ring-indigo-400/50 focus:outline-none placeholder-slate-500 text-[13px] h-8"
 				/>
 				{search && (
 					<button
@@ -72,7 +72,7 @@ export const EventFilterBar: React.FC<Props> = ({
 						<button
 							key={option.key}
 							onClick={() => onStatusChange(option.key)}
-							className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all cursor-pointer ${
+							className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
 								status === option.key
 									? option.active
 									: 'text-slate-500 hover:text-slate-400'
@@ -85,7 +85,7 @@ export const EventFilterBar: React.FC<Props> = ({
 
 				<button
 					onClick={() => onOnlyMineChange(!onlyMine)}
-					className={`btn btn-xs h-7 px-2.5 border-none rounded-xl gap-1 text-[10px] font-bold shrink-0 ${
+					className={`btn btn-xs h-7 px-2.5 border-none rounded-xl gap-1 text-[11px] font-bold shrink-0 ${
 						onlyMine
 							? 'bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30'
 							: 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
@@ -98,12 +98,12 @@ export const EventFilterBar: React.FC<Props> = ({
 
 			{hasActiveFilters && (
 				<div className="flex justify-between items-center pt-2 border-t border-slate-900/60">
-					<span className="text-[10px] text-slate-500">
+					<span className="text-[11px] text-slate-500">
 						{t('events.showingCount', { count: shown, total })}
 					</span>
 					<button
 						onClick={onClear}
-						className="btn btn-ghost btn-xs text-error gap-1 hover:bg-error/10 text-[10px] font-bold uppercase tracking-wider rounded-lg px-2 cursor-pointer"
+						className="btn btn-ghost btn-xs text-error gap-1 hover:bg-error/10 text-[11px] font-bold uppercase tracking-wider rounded-lg px-2 cursor-pointer"
 					>
 						<X className="w-3 h-3" />
 						{t('events.filterClear')}

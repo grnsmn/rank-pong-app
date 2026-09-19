@@ -24,7 +24,7 @@ export const PointsPills: React.FC<Props> = ({ points, showPositions = false }) 
 				{entries.map(({ position, value }) => (
 					<span
 						key={position}
-						className={`flex-1 text-center py-1.5 rounded-lg text-xs font-extrabold ${
+						className={`flex-1 text-center py-1.5 rounded-lg text-[13px] font-extrabold ${
 							PILL_STYLES[position - 1] ??
 							(value === 0
 								? 'bg-slate-500/10 text-slate-600'
@@ -40,7 +40,7 @@ export const PointsPills: React.FC<Props> = ({ points, showPositions = false }) 
 					{entries.map(({ position }) => (
 						<span
 							key={position}
-							className="flex-1 text-center text-[9px] font-bold text-slate-600"
+							className="flex-1 text-center text-[10px] font-bold text-slate-600"
 						>
 							{position}°
 						</span>

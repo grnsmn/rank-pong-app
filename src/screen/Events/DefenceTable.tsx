@@ -11,7 +11,7 @@ interface Props {
 	isFirstEdition?: boolean
 }
 
-const GRID = 'grid grid-cols-[1fr_52px_52px_50px] gap-1.5 items-center'
+const GRID = 'grid grid-cols-[1fr_56px_56px_54px] gap-1.5 items-center'
 
 /**
  * Cosa ha fatto la difesa a fine edizione: aveva → ora → Δ.
@@ -33,23 +33,23 @@ export const DefenceTable: React.FC<Props> = ({ standings, currentUserId, isFirs
 		<div>
 			<div className="flex items-center gap-1.5 mb-2">
 				<Shield className="w-3 h-3 text-indigo-400" />
-				<span className="text-[11px] font-bold uppercase tracking-widest text-indigo-400">
+				<span className="text-xs font-bold uppercase tracking-widest text-indigo-400">
 					{t('events.defenceTitle')}
 				</span>
 			</div>
 
 			<div className="rounded-2xl border border-slate-800 bg-slate-900/30 overflow-hidden">
 				<div className={`${GRID} px-3 py-2 bg-slate-950/60`}>
-					<span className="text-[9px] font-bold uppercase tracking-wide text-slate-500">
+					<span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
 						{t('events.colPlayer')}
 					</span>
-					<span className="text-[9px] font-bold uppercase tracking-wide text-slate-500 text-right">
+					<span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 text-right">
 						{t('events.colHad')}
 					</span>
-					<span className="text-[9px] font-bold uppercase tracking-wide text-slate-500 text-right">
+					<span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 text-right">
 						{t('events.colNow')}
 					</span>
-					<span className="text-[9px] font-bold uppercase tracking-wide text-slate-500 text-right">
+					<span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 text-right">
 						Δ
 					</span>
 				</div>
@@ -64,7 +64,7 @@ export const DefenceTable: React.FC<Props> = ({ standings, currentUserId, isFirs
 							}`}
 						>
 							<span
-								className={`text-xs truncate ${
+								className={`text-[13px] truncate ${
 									isMe
 										? 'font-bold text-indigo-400'
 										: 'font-semibold text-slate-200'
@@ -75,14 +75,14 @@ export const DefenceTable: React.FC<Props> = ({ standings, currentUserId, isFirs
 								</span>
 								{isMe ? t('common.you') : (row.player?.display_name ?? '—')}
 							</span>
-							<span className="text-xs font-bold text-slate-500 text-right">
+							<span className="text-[13px] font-bold text-slate-500 text-right">
 								{row.defending_points ?? 0}
 							</span>
-							<span className="text-xs font-extrabold text-slate-200 text-right">
+							<span className="text-[13px] font-extrabold text-slate-200 text-right">
 								{row.projected_points ?? 0}
 							</span>
 							<span
-								className={`text-[13px] font-black text-right ${deltaColor(
+								className={`text-sm font-black text-right ${deltaColor(
 									row.projected_delta ?? 0
 								)}`}
 							>
@@ -93,8 +93,8 @@ export const DefenceTable: React.FC<Props> = ({ standings, currentUserId, isFirs
 				})}
 
 				<div className="flex items-center justify-between gap-2 px-3 py-2.5 bg-slate-950/60 border-t border-slate-800/80">
-					<span className="text-[10px] text-slate-500 leading-snug">{footnote}</span>
-					<span className="text-[11px] font-extrabold text-slate-400 shrink-0">
+					<span className="text-[11px] text-slate-500 leading-snug">{footnote}</span>
+					<span className="text-xs font-extrabold text-slate-400 shrink-0">
 						Σ {formatDelta(sum)}
 					</span>
 				</div>

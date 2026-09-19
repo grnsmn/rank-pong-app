@@ -38,7 +38,9 @@ export const App: React.FC = () => {
 	const checkPendingRequests = async () => {
 		if (!currentUser) return
 		try {
-			const matches = await dbService.getMatches()
+			// Le partite d'evento si confermano nel dettaglio evento: contano
+			// sul badge Eventi, non su questo.
+			const matches = (await dbService.getMatches()).filter(m => !m.event_id)
 			const pendingMatches = matches.filter(
 				m =>
 					m.status === 'pending' &&
@@ -55,17 +57,25 @@ export const App: React.FC = () => {
 			setPendingCount(pendingMatches + pendingCorrections)
 
 			const events = await dbService.getEvents()
-			let matchesToPlay = 0
+			let eventTodos = 0
 			for (const event of events.filter(e => e.status === 'in_progress')) {
 				const detail = await dbService.getEvent(event.id)
-				matchesToPlay += detail.slots.filter(
-					slot =>
-						!slot.match &&
-						(slot.player_1_id === currentUser.id || slot.player_2_id === currentUser.id)
-				).length
+				eventTodos += detail.slots.filter(slot => {
+					const mine =
+						slot.player_1_id === currentUser.id || slot.player_2_id === currentUser.id
+					if (!mine) return false
+					// da giocare, oppure registrata dall'avversario e in attesa di me
+					if (!slot.match) return true
+					const m = slot.match
+					return (
+						m.status === 'pending' &&
+						((m.player_1_id === currentUser.id && !m.player_1_confirmed) ||
+							(m.player_2_id === currentUser.id && !m.player_2_confirmed))
+					)
+				}).length
 			}
 
-			setEventCount(matchesToPlay)
+			setEventCount(eventTodos)
 		} catch (err) {
 			console.error('Errore conteggio notifiche:', err)
 		}

@@ -1,6 +1,6 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
-import { Calendar, Handshake, Trophy, X } from 'lucide-react'
+import { Calendar, Handshake, Swords, Trophy, X } from 'lucide-react'
 import type { MatchWithSets } from '../../services/db'
 import { getSetsScore } from './matchHelpers'
 import { InfoTooltip } from '../../components/InfoTooltip'
@@ -43,6 +43,17 @@ export const PendingConfirmCard: React.FC<PendingConfirmCardProps> = ({
 					{isArbitrated && (
 						<span className="badge badge-sm font-extrabold text-[10px] bg-purple-600 text-white border-none">
 							{t('matches.arbitratorBadge')}
+						</span>
+					)}
+					{match.event_id && (
+						<span
+							className="badge badge-sm font-extrabold text-[10px] bg-indigo-600 text-white border-none gap-1 max-w-[10rem]"
+							title={match.event_name ?? t('events.badgeEvent')}
+						>
+							<Swords className="w-2.5 h-2.5 shrink-0" />
+							<span className="truncate">
+								{match.event_name ?? t('events.badgeEvent')}
+							</span>
 						</span>
 					)}
 					{match.is_friendly && (

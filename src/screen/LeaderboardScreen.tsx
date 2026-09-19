@@ -1,6 +1,7 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import { dbService, type RankingRow } from '../services/db'
+import { useAppStore } from '../store/useAppStore'
 import { useDataFetch } from '../hooks/useDataFetch'
 import { useSearch } from '../hooks/useSearch'
 import { Trophy, Medal, Search, User } from 'lucide-react'
@@ -13,6 +14,7 @@ interface Props {
 
 export const LeaderboardScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 	const { t } = useTranslation()
+	const { currentUser } = useAppStore()
 
 	const { data, isLoading } = useDataFetch(() => dbService.getRanking(), {
 		refetchOnFocus: true,
@@ -68,6 +70,8 @@ export const LeaderboardScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 		}
 	}
 
+	const myPosition = profiles.findIndex(p => p.id === currentUser?.id) + 1
+
 	const topThree = filteredProfiles.slice(0, 3)
 	const restOfPlayers = filteredProfiles.slice(3)
 
@@ -77,24 +81,11 @@ export const LeaderboardScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 				<h2 className="text-xl font-bold tracking-tight text-white mb-1">
 					{t('leaderboard.title')}
 				</h2>
-				<p className="text-xs text-slate-400">{t('leaderboard.subtitle')}</p>
-			</div>
-
-			{/* Il ranking non e' piu' solo ELO: rendiamo esplicita la somma */}
-			<div className="px-4 pt-2.5 pb-1">
-				<div className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-slate-950/60">
-					<span className="text-[10px] font-bold text-primary">
-						{t('leaderboard.legendElo')}
-					</span>
-					<span className="text-[11px] font-extrabold text-slate-600">+</span>
-					<span className="text-[10px] font-bold text-indigo-400">
-						{t('leaderboard.legendEvents')}
-					</span>
-					<span className="text-[11px] font-extrabold text-slate-600">=</span>
-					<span className="text-[10px] font-bold text-slate-200">
-						{t('leaderboard.legendTotal')}
-					</span>
-				</div>
+				<p className="text-xs text-slate-400">
+					{myPosition > 0
+						? t('leaderboard.yourPosition', { position: myPosition })
+						: t('leaderboard.subtitle')}
+				</p>
 			</div>
 
 			<div className="px-4 py-2">

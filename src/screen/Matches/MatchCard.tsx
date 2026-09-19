@@ -103,9 +103,14 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 						)}
 						{typeBadge}
 						{match.event_id && (
-							<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 text-[9px] font-bold uppercase tracking-wide">
-								<Swords className="w-2.5 h-2.5" />
-								{t('events.badgeEvent')}
+							<span
+								className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 text-[9px] font-bold uppercase tracking-wide max-w-[10rem]"
+								title={match.event_name ?? t('events.badgeEvent')}
+							>
+								<Swords className="w-2.5 h-2.5 shrink-0" />
+								<span className="truncate">
+									{match.event_name ?? t('events.badgeEvent')}
+								</span>
 							</span>
 						)}
 					</span>

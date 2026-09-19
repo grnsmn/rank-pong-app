@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plus, Swords } from 'lucide-react'
 import { dbService, type EventResult, type EventRow } from '../../services/db'
@@ -34,6 +34,12 @@ export const EventsScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 	const { data, isLoading, refetch } = useDataFetch(() => dbService.getEvents(), {
 		refetchOnFocus: true,
 	})
+
+	// La lista cambia anche per mano di altri: iscrizioni, risultati, chiusure.
+	useEffect(() => {
+		const interval = setInterval(refetch, 20000)
+		return () => clearInterval(interval)
+	}, [refetch])
 	const events = data ?? []
 
 	// Per le card serve sapere chi ha vinto e quanti punti ha preso l'utente:
@@ -101,7 +107,7 @@ export const EventsScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 				<h2 className="text-xl font-bold tracking-tight text-white mb-1">
 					{t('events.title')}
 				</h2>
-				<p className="text-xs text-slate-400 leading-snug">{t('events.subtitle')}</p>
+				<p className="text-[13px] text-slate-400 leading-snug">{t('events.subtitle')}</p>
 			</div>
 
 			{/* Creare un evento e' l'azione principale della sezione, non un
@@ -130,7 +136,7 @@ export const EventsScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 				/>
 			</div>
 
-			{isLoading ? (
+			{isLoading && events.length === 0 ? (
 				<div className="flex-1 flex items-center justify-center">
 					<span className="loading loading-spinner loading-md text-primary"></span>
 				</div>

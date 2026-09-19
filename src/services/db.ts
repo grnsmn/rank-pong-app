@@ -31,6 +31,8 @@ export interface Match {
 	player1?: Profile
 	player2?: Profile
 	creator?: Profile
+	/** Nome dell'edizione, quando la partita fa parte di un evento */
+	event_name?: string
 }
 
 export interface SetScore {
@@ -69,7 +71,6 @@ export interface EventRow {
 	status: EventStatus
 	participants_count: number
 	best_of: 3 | 5
-	counts_for_elo: boolean
 	ranking_points: Record<string, number>
 	registration_deadline: string | null
 	started_at: string | null
@@ -77,6 +78,7 @@ export interface EventRow {
 	created_by: string | null
 	created_at: string
 	series_name?: string
+	creator_name?: string
 	accepted_count?: number
 	matches_total?: number
 	matches_played?: number
@@ -554,6 +556,90 @@ function isMissingEventSchema(error: { code?: string; message?: string } | null)
 	return missing
 }
 
+/**
+ * Ramo mock di begin_event: chiude le iscrizioni e genera il girone.
+ * Restituisce true se l'edizione e' stata avviata.
+ */
+function mockBeginEvent(eventId: string): boolean {
+	const events = readMock<EventRow>(EV.events)
+	const ev = events.find(e => e.id === eventId)
+	if (!ev || ev.status !== 'open') return false
+
+	const roster = readMock<EventParticipant>(EV.participants)
+		.filter(x => x.event_id === eventId && x.status === 'accepted')
+		.sort((a, b) => new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime())
+		.map(x => x.player_id)
+	if (roster.length < 4) return false
+
+	const slots = readMock<EventMatchSlot>(EV.slots)
+	generateRoundRobinPairings(roster).forEach(pair => {
+		slots.push({
+			id: mockId('slot'),
+			event_id: eventId,
+			match_id: null,
+			player_1_id: pair.p1,
+			player_2_id: pair.p2,
+			position: pair.position,
+		})
+	})
+	writeMock(EV.slots, slots)
+
+	ev.status = 'in_progress'
+	ev.participants_count = roster.length
+	ev.started_at = new Date().toISOString()
+	writeMock(EV.events, events)
+	return true
+}
+
+/**
+ * Ramo mock del trigger auto_finalize_event: quando tutte le partite del
+ * girone sono confermate l'edizione si chiude e i punti vengono assegnati.
+ */
+function mockFinalizeEventIfComplete(eventId: string): void {
+	const events = readMock<EventRow>(EV.events)
+	const ev = events.find(e => e.id === eventId)
+	if (!ev || ev.status !== 'in_progress') return
+
+	const slots = readMock<EventMatchSlot>(EV.slots).filter(x => x.event_id === eventId)
+	const matches = readMock<MatchWithSets>('rp_matches')
+	const played = slots.filter(
+		sl => matches.find(m => m.id === sl.match_id)?.status === 'confirmed'
+	).length
+	if (slots.length === 0 || played < slots.length) return
+
+	const profiles = JSON.parse(localStorage.getItem('rp_profiles') || '[]') as Profile[]
+	const eloById: Record<string, number> = {}
+	profiles.forEach(p => (eloById[p.id] = p.elo_rating))
+
+	const roster = readMock<EventParticipant>(EV.participants)
+		.filter(x => x.event_id === eventId && x.status === 'accepted')
+		.map(x => x.player_id)
+
+	const standings = computeStandings(
+		roster,
+		matches.filter(m => slots.some(sl => sl.match_id === m.id)),
+		eloById
+	)
+
+	const results = readMock<EventResult>(EV.results).filter(r => r.event_id !== eventId)
+	standings.forEach(row => {
+		results.push({
+			id: mockId('res'),
+			event_id: eventId,
+			series_id: ev.series_id,
+			player_id: row.player_id,
+			final_rank: row.position,
+			ranking_points: ev.ranking_points[String(row.position)] ?? 0,
+			awarded_at: new Date().toISOString(),
+		})
+	})
+	writeMock(EV.results, results)
+
+	ev.status = 'completed'
+	ev.completed_at = new Date().toISOString()
+	writeMock(EV.events, events)
+}
+
 /** Punti evento correnti per giocatore (ramo mock della view ranking). */
 function mockCurrentSeriesPoints(): Record<string, number> {
 	const events = readMock<EventRow>(EV.events)
@@ -813,8 +899,14 @@ export const dbService = {
 
 			if (setsError) throw setsError
 
+			// Il nome dell'evento serve al badge sulle card. Query separata e non
+			// un embed, cosi' se la sezione 9 non e' applicata le partite si
+			// caricano comunque.
+			const eventNames = await this.eventNamesFor(matchesData as any[])
+
 			return matchesData.map((match: any) => ({
 				...match,
+				event_name: match.event_id ? eventNames.get(match.event_id) : undefined,
 				sets: setsData
 					.filter((set: any) => set.match_id === match.id)
 					.sort((a, b) => a.set_number - b.set_number),
@@ -833,12 +925,28 @@ export const dbService = {
 					correction_sets: match.correction_sets ?? null,
 					correction_status: match.correction_status ?? null,
 					event_id: match.event_id ?? null,
+					event_name: match.event_id
+						? readMock<EventRow>(EV.events).find(e => e.id === match.event_id)?.name
+						: undefined,
 					player1: profiles.find(p => p.id === match.player_1_id),
 					player2: profiles.find(p => p.id === match.player_2_id),
 					creator: profiles.find(p => p.id === match.created_by),
 				}))
 				.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 		}
+	},
+
+	/** Nomi delle edizioni citate dalle partite, vuoto se lo schema eventi manca. */
+	async eventNamesFor(matches: { event_id?: string | null }[]): Promise<Map<string, string>> {
+		const ids = [...new Set(matches.map(m => m.event_id).filter(Boolean))] as string[]
+		if (ids.length === 0 || !isSupabaseConfigured || !supabase) return new Map()
+
+		const { data, error } = await supabase.from('events').select('id, name').in('id', ids)
+		if (error) {
+			if (isMissingEventSchema(error)) return new Map()
+			throw error
+		}
+		return new Map((data as any[]).map(e => [e.id, e.name]))
 	},
 
 	async createMatch(
@@ -1095,6 +1203,11 @@ export const dbService = {
 			}
 
 			localStorage.setItem('rp_matches', JSON.stringify(matches))
+
+			// Equivalente del trigger auto_finalize_event lato Supabase.
+			if (matches[idx].status === 'confirmed' && matches[idx].event_id) {
+				mockFinalizeEventIfComplete(matches[idx].event_id)
+			}
 		}
 	},
 
@@ -1332,7 +1445,7 @@ export const dbService = {
 		if (isSupabaseConfigured && supabase) {
 			const { data: events, error } = await supabase
 				.from('events')
-				.select('*, series:series_id(name)')
+				.select('*, series:series_id(name), creator:created_by(display_name)')
 				.order('created_at', { ascending: false })
 			if (error) {
 				if (isMissingEventSchema(error)) return []
@@ -1354,6 +1467,7 @@ export const dbService = {
 			return (events as any[]).map(ev => ({
 				...ev,
 				series_name: ev.series?.name,
+				creator_name: ev.creator?.display_name,
 				i_organize: !!me && ev.created_by === me,
 				i_am_in: (parts as any[]).some(
 					x => x.event_id === ev.id && x.player_id === me && x.status === 'accepted'
@@ -1372,6 +1486,7 @@ export const dbService = {
 			const parts = readMock<EventParticipant>(EV.participants)
 			const slots = readMock<EventMatchSlot>(EV.slots)
 			const matches = readMock<MatchWithSets>('rp_matches')
+			const profiles = JSON.parse(localStorage.getItem('rp_profiles') || '[]') as Profile[]
 
 			const me = (await this.getCurrentUser())?.id
 
@@ -1379,6 +1494,7 @@ export const dbService = {
 				.map(ev => ({
 					...ev,
 					series_name: series.find(x => x.id === ev.series_id)?.name,
+					creator_name: profiles.find(x => x.id === ev.created_by)?.display_name,
 					i_organize: !!me && ev.created_by === me,
 					i_am_in: parts.some(
 						x => x.event_id === ev.id && x.player_id === me && x.status === 'accepted'
@@ -1523,7 +1639,6 @@ export const dbService = {
 		eventName: string
 		participantsCount: number
 		bestOf: 3 | 5
-		countsForElo: boolean
 		points?: Record<string, number>
 		deadline?: string | null
 	}): Promise<string> {
@@ -1538,7 +1653,6 @@ export const dbService = {
 				event_name: params.eventName,
 				participants_count_param: params.participantsCount,
 				best_of_param: params.bestOf,
-				counts_for_elo_param: params.countsForElo,
 				points_param: points,
 				deadline_param: params.deadline ?? null,
 			})
@@ -1575,7 +1689,6 @@ export const dbService = {
 				status: 'open',
 				participants_count: params.participantsCount,
 				best_of: params.bestOf,
-				counts_for_elo: params.countsForElo,
 				ranking_points: points,
 				registration_deadline: params.deadline ?? null,
 				started_at: null,
@@ -1640,6 +1753,36 @@ export const dbService = {
 		}
 	},
 
+	/** Disiscrizione, possibile solo finche' le iscrizioni sono aperte. */
+	async leaveEvent(eventId: string): Promise<void> {
+		const currentUser = await this.getCurrentUser()
+		if (!currentUser) throw new Error('Devi essere autenticato')
+
+		if (isSupabaseConfigured && supabase) {
+			const { error } = await supabase.rpc('leave_event', { event_id_param: eventId })
+			if (error) throw error
+		} else {
+			const events = readMock<EventRow>(EV.events)
+			const ev = events.find(e => e.id === eventId)
+			if (!ev) throw new Error('Evento non trovato')
+			if (ev.status !== 'open') {
+				throw new Error("L'evento è già partito: non puoi più uscire")
+			}
+
+			const parts = readMock<EventParticipant>(EV.participants)
+			const mine = parts.find(
+				x =>
+					x.event_id === eventId &&
+					x.player_id === currentUser.id &&
+					x.status === 'accepted'
+			)
+			if (!mine) throw new Error('Non sei iscritto a questo evento')
+
+			mine.status = 'withdrawn'
+			writeMock(EV.participants, parts)
+		}
+	},
+
 	async startEvent(eventId: string): Promise<void> {
 		const currentUser = await this.getCurrentUser()
 		if (!currentUser) throw new Error('Devi essere autenticato')
@@ -1656,33 +1799,14 @@ export const dbService = {
 			}
 			if (ev.status !== 'open') throw new Error("L'evento è già stato avviato")
 
-			const parts = readMock<EventParticipant>(EV.participants)
-			const roster = parts
-				.filter(x => x.event_id === eventId && x.status === 'accepted')
-				.sort((a, b) => new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime())
-				.map(x => x.player_id)
-
-			if (roster.length < 4) {
+			const accepted = readMock<EventParticipant>(EV.participants).filter(
+				x => x.event_id === eventId && x.status === 'accepted'
+			).length
+			if (accepted < 4) {
 				throw new Error("Servono almeno 4 giocatori per avviare l'evento")
 			}
 
-			const slots = readMock<EventMatchSlot>(EV.slots)
-			generateRoundRobinPairings(roster).forEach(pair => {
-				slots.push({
-					id: mockId('slot'),
-					event_id: eventId,
-					match_id: null,
-					player_1_id: pair.p1,
-					player_2_id: pair.p2,
-					position: pair.position,
-				})
-			})
-			writeMock(EV.slots, slots)
-
-			ev.status = 'in_progress'
-			ev.participants_count = roster.length
-			ev.started_at = new Date().toISOString()
-			writeMock(EV.events, events)
+			mockBeginEvent(eventId)
 		}
 	},
 
@@ -1716,62 +1840,39 @@ export const dbService = {
 		}
 	},
 
-	async closeEvent(eventId: string): Promise<void> {
+	/**
+	 * Rifiuta una registrazione dentro un evento: annulla la partita e libera
+	 * lo slot. Dentro un girone "contestato" bloccherebbe la chiusura.
+	 */
+	async rejectEventMatch(eventMatchId: string): Promise<void> {
 		const currentUser = await this.getCurrentUser()
 		if (!currentUser) throw new Error('Devi essere autenticato')
 
 		if (isSupabaseConfigured && supabase) {
-			const { error } = await supabase.rpc('close_event', { event_id_param: eventId })
+			const { error } = await supabase.rpc('reject_event_match', {
+				event_match_id_param: eventMatchId,
+			})
 			if (error) throw error
 		} else {
-			const events = readMock<EventRow>(EV.events)
-			const ev = events.find(e => e.id === eventId)
-			if (!ev) throw new Error('Evento non trovato')
-			if (ev.created_by !== currentUser.id) {
-				throw new Error("Solo l'organizzatore può chiudere l'evento")
-			}
-			if (ev.status !== 'in_progress') throw new Error("L'evento non è in corso")
+			const slots = readMock<EventMatchSlot>(EV.slots)
+			const slot = slots.find(x => x.id === eventMatchId)
+			if (!slot) throw new Error('Slot non trovato')
+			if (!slot.match_id) throw new Error("Non c'è nessun risultato da rifiutare")
 
-			const slots = readMock<EventMatchSlot>(EV.slots).filter(x => x.event_id === eventId)
-			const allMatches = await this.getMatches()
-			const played = slots.filter(
-				sl => allMatches.find(m => m.id === sl.match_id)?.status === 'confirmed'
-			).length
-			if (played < slots.length) {
-				throw new Error(`Mancano ancora ${slots.length - played} partite da giocare`)
+			const matches = readMock<MatchWithSets>('rp_matches')
+			const m = matches.find(x => x.id === slot.match_id)
+			if (!m) throw new Error('Match non trovato')
+			if (m.status !== 'pending') throw new Error('Il risultato è già stato confermato')
+			if (currentUser.id !== m.player_1_id && currentUser.id !== m.player_2_id) {
+				throw new Error('Non sei un giocatore di questa partita')
 			}
 
-			const profiles = await this.getProfiles()
-			const eloById: Record<string, number> = {}
-			profiles.forEach(p => (eloById[p.id] = p.elo_rating))
-
-			const roster = readMock<EventParticipant>(EV.participants)
-				.filter(x => x.event_id === eventId && x.status === 'accepted')
-				.map(x => x.player_id)
-
-			const standings = computeStandings(
-				roster,
-				allMatches.filter(m => slots.some(sl => sl.match_id === m.id)),
-				eloById
+			slot.match_id = null
+			writeMock(EV.slots, slots)
+			writeMock(
+				'rp_matches',
+				matches.filter(x => x.id !== m.id)
 			)
-
-			const results = readMock<EventResult>(EV.results).filter(r => r.event_id !== eventId)
-			standings.forEach(row => {
-				results.push({
-					id: mockId('res'),
-					event_id: eventId,
-					series_id: ev.series_id,
-					player_id: row.player_id,
-					final_rank: row.position,
-					ranking_points: ev.ranking_points[String(row.position)] ?? 0,
-					awarded_at: new Date().toISOString(),
-				})
-			})
-			writeMock(EV.results, results)
-
-			ev.status = 'completed'
-			ev.completed_at = new Date().toISOString()
-			writeMock(EV.events, events)
 		}
 	},
 
@@ -1882,6 +1983,10 @@ export const dbService = {
 		const out: Record<string, { position: number; defending: number; projected: number }> = {}
 
 		for (const ev of inProgress) {
+			// A zero partite giocate la classifica e' solo spareggio ELO:
+			// una proiezione su quell'ordine sarebbe inventata.
+			if ((ev.matches_played ?? 0) === 0) continue
+
 			const detail = await this.getEvent(ev.id)
 			const mine = detail.standings.find(r => r.player_id === currentUser.id)
 			if (!mine) continue

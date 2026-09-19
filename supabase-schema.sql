@@ -854,7 +854,6 @@ create table if not exists public.events (
   participants_count integer not null default 6
     check (participants_count between 4 and 8),
   best_of integer not null default 5 check (best_of in (3,5)),
-  counts_for_elo boolean not null default false,
   ranking_points jsonb not null,
   registration_deadline timestamptz,
   started_at timestamptz,
@@ -901,6 +900,9 @@ create table if not exists public.event_results (
 -- Puntatore denormalizzato per il badge "evento" su MatchCard senza join extra.
 -- Scritto dalla stessa RPC che aggancia lo slot (link_event_match).
 alter table public.matches add column if not exists event_id uuid references public.events(id) on delete set null;
+-- Se la sezione 9 era gia' stata applicata con il flag: le partite d'evento
+-- sono sempre neutre, la colonna non serve piu'.
+alter table public.events drop column if exists counts_for_elo;
 
 create index if not exists idx_event_matches_event on public.event_matches(event_id);
 create index if not exists idx_event_results_series on public.event_results(series_id, player_id);
@@ -1119,12 +1121,14 @@ end;
 $$;
 
 -- Crea una nuova edizione di una serie e iscrive l'organizzatore.
+-- La firma e' cambiata (via counts_for_elo): il drop evita un overload.
+drop function if exists public.create_event(text, text, integer, integer, boolean, jsonb, timestamptz);
+
 create or replace function public.create_event(
   series_name text,
   event_name text,
   participants_count_param integer default 6,
   best_of_param integer default 5,
-  counts_for_elo_param boolean default false,
   points_param jsonb default null,
   deadline_param timestamptz default null
 )
@@ -1149,10 +1153,10 @@ begin
 
   insert into public.events (
     series_id, edition_number, name, status, participants_count,
-    best_of, counts_for_elo, ranking_points, registration_deadline, created_by
+    best_of, ranking_points, registration_deadline, created_by
   ) values (
     sid, next_edition, event_name, 'open', participants_count_param,
-    best_of_param, counts_for_elo_param,
+    best_of_param,
     coalesce(points_param, public.default_event_points(participants_count_param)),
     deadline_param, auth.uid()
   ) returning id into new_event_id;
@@ -1163,6 +1167,12 @@ begin
   return new_event_id;
 end;
 $$;
+
+-- Le prime versioni di questa sezione inserivano le iscrizioni come 'pending',
+-- in attesa dell'approvazione dell'organizzatore. Da quando l'iscrizione e'
+-- diretta quello stato non esiste piu': chi era rimasto in mezzo va promosso,
+-- altrimenti resta invisibile ai conteggi e non c'e' piu' modo di approvarlo.
+update public.event_participants set status = 'accepted' where status = 'pending';
 
 -- Iscrizione diretta: chi si iscrive entra subito, senza approvazione.
 -- L'unico cancello sono i posti disponibili e lo stato dell'evento.
@@ -1194,11 +1204,48 @@ begin
 end;
 $$;
 
+-- Disiscrizione. Solo a iscrizioni ancora aperte: dopo la generazione del
+-- calendario uscire lascerebbe il girone con partite impossibili da giocare.
+-- Lo stato 'withdrawn' tiene traccia del passaggio e l'upsert di apply_to_event
+-- permette di rientrare senza intoppi.
+create or replace function public.leave_event(event_id_param uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  ev public.events%rowtype;
+begin
+  select * into ev from public.events where id = event_id_param;
+  if not found then raise exception 'Evento non trovato'; end if;
+  if ev.status <> 'open' then
+    raise exception 'L''evento e'' gia'' partito: non puoi piu'' uscire';
+  end if;
+
+  update public.event_participants
+     set status = 'withdrawn'
+   where event_id = event_id_param
+     and player_id = auth.uid()
+     and status = 'accepted';
+
+  if not found then raise exception 'Non sei iscritto a questo evento'; end if;
+end;
+$$;
+
 -- L'approvazione delle candidature non esiste piu': l'iscrizione e' diretta.
 -- Il drop serve a ripulire i database dove la sezione 9 era gia' stata applicata.
 drop function if exists public.respond_to_application(uuid, boolean);
 
+-- L'avvio automatico a rosa piena e' stato abbandonato: chiudere le iscrizioni
+-- resta una decisione dell'organizzatore. I drop ripuliscono i database dove
+-- quella versione era gia' stata applicata.
+drop trigger if exists on_event_roster_full on public.event_participants;
+drop function if exists public.auto_begin_event();
+drop function if exists public.begin_event(uuid);
+
 -- Chiude le iscrizioni e genera tutti gli accoppiamenti del girone.
+-- La decide l'organizzatore, anche con una rosa incompleta (minimo 4).
 create or replace function public.start_event(event_id_param uuid)
 returns void
 language plpgsql
@@ -1277,10 +1324,47 @@ begin
 end;
 $$;
 
+-- Rifiuto di una registrazione dentro un evento.
+-- Dentro un girone "contestato" non puo' essere uno stato finale: bloccherebbe
+-- per sempre la chiusura dell'edizione. Qui rifiutare significa annullare la
+-- registrazione e liberare lo slot, cosi' il punteggio si puo' reinserire.
+create or replace function public.reject_event_match(event_match_id_param uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  slot public.event_matches%rowtype;
+  m public.matches%rowtype;
+begin
+  select * into slot from public.event_matches where id = event_match_id_param;
+  if not found then raise exception 'Slot non trovato'; end if;
+  if slot.match_id is null then raise exception 'Non c''e'' nessun risultato da rifiutare'; end if;
+
+  select * into m from public.matches where id = slot.match_id;
+  if not found then raise exception 'Match non trovato'; end if;
+  if m.status <> 'pending' then
+    raise exception 'Il risultato e'' gia'' stato confermato';
+  end if;
+  if auth.uid() <> m.player_1_id and auth.uid() <> m.player_2_id then
+    raise exception 'Non sei un giocatore di questa partita';
+  end if;
+
+  update public.event_matches set match_id = null where id = event_match_id_param;
+  -- i set spariscono in cascata con il match
+  delete from public.matches where id = m.id;
+end;
+$$;
+
 -- Congela la classifica finale e assegna i punti al ranking.
 -- I punti NON vengono sommati a profiles.elo_rating: la sostituzione
 -- (difesa) emerge dalla view player_series_points.
-create or replace function public.close_event(event_id_param uuid)
+--
+-- Non ha controlli di identita' perche' non la chiama una persona: scatta da
+-- sola quando l'ultima partita del girone viene confermata (vedi il trigger
+-- piu' sotto).
+create or replace function public.finalize_event(event_id_param uuid)
 returns void
 language plpgsql
 security definer
@@ -1294,10 +1378,7 @@ declare
 begin
   select * into ev from public.events where id = event_id_param;
   if not found then raise exception 'Evento non trovato'; end if;
-  if ev.created_by <> auth.uid() then
-    raise exception 'Solo l''organizzatore puo'' chiudere l''evento';
-  end if;
-  if ev.status <> 'in_progress' then raise exception 'L''evento non e'' in corso'; end if;
+  if ev.status <> 'in_progress' then return; end if;
 
   select count(*) into total_slots from public.event_matches where event_id = event_id_param;
   select count(*) into played_slots
@@ -1305,8 +1386,8 @@ begin
   join public.matches m on m.id = em.match_id
   where em.event_id = event_id_param and m.status = 'confirmed';
 
-  if played_slots < total_slots then
-    raise exception 'Mancano ancora % partite da giocare', total_slots - played_slots;
+  if total_slots = 0 or played_slots < total_slots then
+    return;
   end if;
 
   for row_rec in select * from public.event_standings(event_id_param) loop
@@ -1329,3 +1410,31 @@ begin
    where id = event_id_param;
 end;
 $$;
+
+-- La chiusura manuale non esiste piu': l'edizione si conclude da sola.
+drop function if exists public.close_event(uuid);
+
+-- Quando l'ultima partita del girone viene confermata, l'edizione si chiude
+-- e i punti vengono assegnati. Deve essere AFTER UPDATE: finalize_event
+-- riconta le partite confermate e questa riga deve gia' esserlo.
+create or replace function public.auto_finalize_event()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.event_id is null then return null; end if;
+  if new.status <> 'confirmed' or coalesce(old.status, '') = 'confirmed' then
+    return null;
+  end if;
+
+  perform public.finalize_event(new.event_id);
+  return null;
+end;
+$$;
+
+drop trigger if exists on_event_match_confirmed on public.matches;
+create trigger on_event_match_confirmed
+  after update on public.matches
+  for each row execute procedure public.auto_finalize_event();
