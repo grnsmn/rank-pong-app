@@ -18,6 +18,7 @@ import {
 	ChevronDown,
 } from 'lucide-react'
 import { InfoTooltip } from '../components/InfoTooltip'
+import { PalmaresSection } from './Profile/PalmaresSection'
 
 // ---------------------------------------------------------------------------
 // Tipi locali
@@ -38,6 +39,18 @@ export const ProfileScreen: React.FC = () => {
 	const { currentProfile, logout, updateProfile } = useAppStore()
 
 	const { data, isLoading } = useDataFetch(() => dbService.getMatches())
+
+	// Il ranking mostrato somma ELO delle partite e punti evento correnti:
+	// le due componenti restano separate nel DB, si sommano solo qui.
+	const { data: rankingData } = useDataFetch(() => dbService.getRanking(), {
+		refetchOnFocus: true,
+	})
+	const myRanking = (rankingData ?? []).find(r => r.id === currentProfile?.id)
+
+	const { data: palmaresData } = useDataFetch(
+		() => (currentProfile ? dbService.getPalmares(currentProfile.id) : Promise.resolve(null)),
+		{ refetchOnFocus: true }
+	)
 	const matches = data ?? []
 
 	const {
@@ -178,16 +191,32 @@ export const ProfileScreen: React.FC = () => {
 							` • ${currentProfile.age} ${t('common.years')}`}
 					</p>
 
-					<div className="mt-4 px-6 py-2.5 bg-slate-950 rounded-2xl border border-slate-850 flex flex-col items-center">
+					<div className="mt-4 w-full px-5 py-3.5 bg-slate-950 rounded-2xl border border-slate-800 flex flex-col items-center">
 						<span className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">
-							{t('profile.currentScore')}
+							{t('profile.rankingLabel')}
 						</span>
-						<span className="text-3xl font-black text-primary">
-							{currentProfile.elo_rating}
+						<span className="text-3xl font-black text-white leading-tight">
+							{myRanking?.total_points ?? currentProfile.elo_rating}
 						</span>
-						<span className="text-[10px] text-slate-400 font-medium">
-							{t('profile.eloRank')}
-						</span>
+						<div className="flex items-center justify-center gap-2.5 mt-2 pt-2.5 border-t border-slate-800/80 w-full">
+							<div className="text-center">
+								<div className="text-sm font-extrabold text-primary">
+									{currentProfile.elo_rating}
+								</div>
+								<div className="text-[9px] text-slate-500">
+									{t('profile.rankingFromMatches')}
+								</div>
+							</div>
+							<span className="text-sm font-extrabold text-slate-600">+</span>
+							<div className="text-center">
+								<div className="text-sm font-extrabold text-indigo-400">
+									{myRanking?.event_points ?? 0}
+								</div>
+								<div className="text-[9px] text-slate-500">
+									{t('profile.rankingFromEvents')}
+								</div>
+							</div>
+						</div>
 					</div>
 
 					{/* Bottone modifica */}
@@ -225,16 +254,24 @@ export const ProfileScreen: React.FC = () => {
 								<label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
 									{t('profile.editDisplayName')}
 								</label>
-								<input
-									id="profile-edit-display-name"
-									type="text"
-									value={form.display_name}
-									onChange={e =>
-										setForm(prev => ({ ...prev, display_name: e.target.value }))
-									}
-									placeholder={t('profile.editDisplayNamePlaceholder')}
-									className="input input-sm bg-slate-900 border-slate-700 text-white placeholder-slate-600 focus:border-primary focus:outline-none rounded-xl w-full"
-								/>
+								<div className="relative">
+									<span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500 pointer-events-none">
+										<User className="w-3.5 h-3.5" />
+									</span>
+									<input
+										id="profile-edit-display-name"
+										type="text"
+										value={form.display_name}
+										onChange={e =>
+											setForm(prev => ({
+												...prev,
+												display_name: e.target.value,
+											}))
+										}
+										placeholder={t('profile.editDisplayNamePlaceholder')}
+										className="input input-sm pl-8.5 bg-slate-900 border-slate-700 text-white placeholder-slate-600 focus:border-primary focus:outline-none rounded-xl w-full"
+									/>
+								</div>
 							</div>
 
 							{/* Età */}
@@ -242,18 +279,23 @@ export const ProfileScreen: React.FC = () => {
 								<label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
 									{t('profile.editAge')}
 								</label>
-								<input
-									id="profile-edit-age"
-									type="number"
-									min={5}
-									max={120}
-									value={form.age}
-									onChange={e =>
-										setForm(prev => ({ ...prev, age: e.target.value }))
-									}
-									placeholder={t('profile.editAgePlaceholder')}
-									className="input input-sm bg-slate-900 border-slate-700 text-white placeholder-slate-600 focus:border-primary focus:outline-none rounded-xl w-full"
-								/>
+								<div className="relative">
+									<span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500 pointer-events-none">
+										<Calendar className="w-3.5 h-3.5" />
+									</span>
+									<input
+										id="profile-edit-age"
+										type="number"
+										min={5}
+										max={120}
+										value={form.age}
+										onChange={e =>
+											setForm(prev => ({ ...prev, age: e.target.value }))
+										}
+										placeholder={t('profile.editAgePlaceholder')}
+										className="input input-sm pl-8.5 bg-slate-900 border-slate-700 text-white placeholder-slate-600 focus:border-primary focus:outline-none rounded-xl w-full"
+									/>
+								</div>
 							</div>
 
 							{/* Tipo giocatore */}
@@ -322,6 +364,9 @@ export const ProfileScreen: React.FC = () => {
 						</div>
 					</div>
 				)}
+
+				{/* --- Palmares eventi --- */}
+				{palmaresData && <PalmaresSection palmares={palmaresData} />}
 
 				{/* --- Statistiche --- */}
 				{isLoading ? (

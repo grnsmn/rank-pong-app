@@ -26,6 +26,7 @@ export interface Match {
 	correction_requested_by: string | null
 	correction_sets: { set_number: number; score_p1: number; score_p2: number }[] | null
 	correction_status: 'pending' | 'approved' | 'rejected' | null
+	event_id: string | null
 	created_at: string
 	player1?: Profile
 	player2?: Profile
@@ -42,6 +43,122 @@ export interface SetScore {
 
 export interface MatchWithSets extends Match {
 	sets: SetScore[]
+}
+
+// --- EVENTI ---
+// Una serie si ripete in edizioni; il piazzamento finale assegna punti al
+// ranking globale, che si difendono all'edizione successiva della stessa serie.
+
+export type EventStatus = 'open' | 'in_progress' | 'completed' | 'cancelled'
+export type ParticipantStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn'
+
+export interface EventSeries {
+	id: string
+	name: string
+	format: 'round_robin'
+	default_points: Record<string, number>
+	created_by: string | null
+	created_at: string
+}
+
+export interface EventRow {
+	id: string
+	series_id: string
+	edition_number: number
+	name: string
+	status: EventStatus
+	participants_count: number
+	best_of: 3 | 5
+	counts_for_elo: boolean
+	ranking_points: Record<string, number>
+	registration_deadline: string | null
+	started_at: string | null
+	completed_at: string | null
+	created_by: string | null
+	created_at: string
+	series_name?: string
+	accepted_count?: number
+	matches_total?: number
+	matches_played?: number
+	/** L'utente corrente e' iscritto */
+	i_am_in?: boolean
+	/** L'utente corrente e' l'organizzatore */
+	i_organize?: boolean
+}
+
+export interface EventParticipant {
+	id: string
+	event_id: string
+	player_id: string
+	status: ParticipantStatus
+	joined_at: string
+	player?: Profile
+}
+
+export interface EventMatchSlot {
+	id: string
+	event_id: string
+	match_id: string | null
+	player_1_id: string
+	player_2_id: string
+	position: number
+	player1?: Profile
+	player2?: Profile
+	match?: MatchWithSets
+}
+
+export interface EventResult {
+	id: string
+	event_id: string
+	series_id: string
+	player_id: string
+	final_rank: number
+	ranking_points: number
+	awarded_at: string
+	event_name?: string
+	edition_number?: number
+	is_current?: boolean
+	player_name?: string
+}
+
+export interface StandingRow {
+	player_id: string
+	position: number
+	played: number
+	wins: number
+	losses: number
+	sets_won: number
+	sets_lost: number
+	set_diff: number
+	point_diff: number
+	player?: Profile
+	/** Punti che il giocatore sta difendendo in questa serie */
+	defending_points?: number
+	/** Punti che prenderebbe con questo piazzamento */
+	projected_points?: number
+	/** Differenza fra i due: la proiezione sul ranking */
+	projected_delta?: number
+}
+
+export interface EventDetail extends EventRow {
+	participants: EventParticipant[]
+	slots: EventMatchSlot[]
+	standings: StandingRow[]
+}
+
+export interface RankingRow extends Profile {
+	event_points: number
+	total_points: number
+}
+
+export interface Palmares {
+	titles: number
+	seconds: number
+	thirds: number
+	editions_played: number
+	results: EventResult[]
+	/** Serie di cui il giocatore e' campione in carica */
+	reigning: string[]
 }
 
 // =========================================================================
@@ -111,6 +228,7 @@ const INITIAL_MOCK_MATCHES: MatchWithSets[] = [
 		correction_requested_by: null,
 		correction_sets: null,
 		correction_status: null,
+		event_id: null,
 		created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
 		sets: [
 			{ id: 'set-1-1', match_id: 'match-1', set_number: 1, score_p1: 11, score_p2: 8 },
@@ -160,6 +278,307 @@ export function calculateEloTS(
 	const changeB = Math.round(kB * (sB - eB))
 
 	return { changeA, changeB }
+}
+
+// =========================================================================
+// HELPER EVENTI (puri, usati da entrambi i rami del doppio binario)
+// =========================================================================
+
+/**
+ * Preset punti per numero di giocatori: sempre esattamente n posizioni.
+ * La curva decade fino all'ultimo posto, che prende comunque una quota
+ * proporzionata (circa meta' del penultimo) invece di zero.
+ * Replica di default_event_points in SQL.
+ */
+const POINTS_PRESETS: Record<number, number[]> = {
+	4: [120, 70, 40, 20],
+	5: [140, 90, 55, 32, 16],
+	6: [180, 120, 80, 45, 20, 10],
+	7: [200, 135, 90, 58, 35, 20, 10],
+	8: [220, 150, 100, 66, 42, 26, 15, 8],
+}
+
+export function defaultEventPoints(n: number): Record<string, number> {
+	const preset = POINTS_PRESETS[n] ?? POINTS_PRESETS[6]
+	const out: Record<string, number> = {}
+	preset.forEach((value, index) => (out[String(index + 1)] = value))
+	return out
+}
+
+/** Tutte le coppie una sola volta, nello stesso ordine di start_event in SQL. */
+export function generateRoundRobinPairings(
+	playerIds: string[]
+): { p1: string; p2: string; position: number }[] {
+	const out: { p1: string; p2: string; position: number }[] = []
+	let position = 1
+	for (let i = 0; i < playerIds.length - 1; i++) {
+		for (let j = i + 1; j < playerIds.length; j++) {
+			out.push({ p1: playerIds[i], p2: playerIds[j], position: position++ })
+		}
+	}
+	return out
+}
+
+/**
+ * Classifica del girone. Replica di event_standings in SQL.
+ * Tie-break: vittorie -> scontro diretto fra pari vittorie -> differenza set
+ * -> differenza punti -> ELO.
+ */
+export function computeStandings(
+	participantIds: string[],
+	matches: MatchWithSets[],
+	eloById: Record<string, number>
+): StandingRow[] {
+	const base: Record<
+		string,
+		{ played: number; wins: number; sw: number; sl: number; pf: number; pa: number }
+	> = {}
+	participantIds.forEach(id => {
+		base[id] = { played: 0, wins: 0, sw: 0, sl: 0, pf: 0, pa: 0 }
+	})
+
+	const beaten: Record<string, string[]> = {}
+	participantIds.forEach(id => (beaten[id] = []))
+
+	matches
+		.filter(m => m.status === 'confirmed')
+		.forEach(m => {
+			const a = m.player_1_id
+			const b = m.player_2_id
+			if (!base[a] || !base[b]) return
+
+			let setsA = 0
+			let setsB = 0
+			let ptsA = 0
+			let ptsB = 0
+			m.sets.forEach(set => {
+				if (set.score_p1 > set.score_p2) setsA++
+				else if (set.score_p2 > set.score_p1) setsB++
+				ptsA += set.score_p1
+				ptsB += set.score_p2
+			})
+
+			base[a].played++
+			base[b].played++
+			base[a].sw += setsA
+			base[a].sl += setsB
+			base[b].sw += setsB
+			base[b].sl += setsA
+			base[a].pf += ptsA
+			base[a].pa += ptsB
+			base[b].pf += ptsB
+			base[b].pa += ptsA
+
+			if (setsA > setsB) {
+				base[a].wins++
+				beaten[a].push(b)
+			} else {
+				base[b].wins++
+				beaten[b].push(a)
+			}
+		})
+
+	// Scontro diretto: vittorie contro giocatori con lo stesso numero di vittorie
+	const h2h: Record<string, number> = {}
+	participantIds.forEach(id => {
+		h2h[id] = beaten[id].filter(opp => base[opp] && base[opp].wins === base[id].wins).length
+	})
+
+	return participantIds
+		.slice()
+		.sort((x, y) => {
+			const bx = base[x]
+			const by = base[y]
+			if (by.wins !== bx.wins) return by.wins - bx.wins
+			if (h2h[y] !== h2h[x]) return h2h[y] - h2h[x]
+			const dx = bx.sw - bx.sl
+			const dy = by.sw - by.sl
+			if (dy !== dx) return dy - dx
+			const px = bx.pf - bx.pa
+			const py = by.pf - by.pa
+			if (py !== px) return py - px
+			return (eloById[y] ?? 0) - (eloById[x] ?? 0)
+		})
+		.map((id, index) => ({
+			player_id: id,
+			position: index + 1,
+			played: base[id].played,
+			wins: base[id].wins,
+			losses: base[id].played - base[id].wins,
+			sets_won: base[id].sw,
+			sets_lost: base[id].sl,
+			set_diff: base[id].sw - base[id].sl,
+			point_diff: base[id].pf - base[id].pa,
+		}))
+}
+
+// --- Storage mock e builder condivisi dai due rami ---
+
+const EV = {
+	series: 'rp_event_series',
+	events: 'rp_events',
+	participants: 'rp_event_participants',
+	slots: 'rp_event_matches',
+	results: 'rp_event_results',
+} as const
+
+function readMock<T>(key: string): T[] {
+	return JSON.parse(localStorage.getItem(key) || '[]') as T[]
+}
+
+function writeMock<T>(key: string, rows: T[]): void {
+	localStorage.setItem(key, JSON.stringify(rows))
+}
+
+function mockId(prefix: string): string {
+	return prefix + '-' + Math.random().toString(36).slice(2, 11)
+}
+
+type EditionRef = { id: string; edition_number: number; status: string }
+type ResultRef = { player_id: string; event_id: string; ranking_points: number }
+
+/**
+ * Punti che ogni giocatore sta difendendo in una serie: quelli della sua
+ * edizione conclusa piu' recente *precedente* a quella indicata.
+ */
+export function defendingPointsFor(
+	seriesEvents: EditionRef[],
+	seriesResults: ResultRef[],
+	beforeEdition: number
+): Record<string, number> {
+	const eligible = new Map<string, number>()
+	seriesEvents
+		.filter(e => e.status === 'completed' && e.edition_number < beforeEdition)
+		.forEach(e => eligible.set(e.id, e.edition_number))
+
+	const best: Record<string, { edition: number; points: number }> = {}
+	seriesResults.forEach(r => {
+		const edition = eligible.get(r.event_id)
+		if (edition === undefined) return
+		const cur = best[r.player_id]
+		if (!cur || edition > cur.edition) {
+			best[r.player_id] = { edition, points: r.ranking_points }
+		}
+	})
+
+	const out: Record<string, number> = {}
+	Object.entries(best).forEach(([playerId, v]) => (out[playerId] = v.points))
+	return out
+}
+
+/** Arricchisce la classifica con la proiezione della difesa. */
+function withProjection(
+	standings: StandingRow[],
+	rankingPoints: Record<string, number>,
+	defending: Record<string, number>
+): StandingRow[] {
+	return standings.map(row => {
+		const projected = rankingPoints[String(row.position)] ?? 0
+		const defend = defending[row.player_id] ?? 0
+		return {
+			...row,
+			defending_points: defend,
+			projected_points: projected,
+			projected_delta: projected - defend,
+		}
+	})
+}
+
+/** Palmares e campionati in carica a partire dai risultati grezzi. */
+export function buildPalmares(
+	playerId: string,
+	results: EventResult[],
+	events: (EditionRef & { name: string; series_id: string })[]
+): Palmares {
+	const byId = new Map(events.map(e => [e.id, e]))
+	const mine = results
+		.filter(r => r.player_id === playerId && byId.get(r.event_id)?.status === 'completed')
+		.map(r => {
+			const ev = byId.get(r.event_id)!
+			return { ...r, event_name: ev.name, edition_number: ev.edition_number }
+		})
+		.sort((a, b) => (b.edition_number ?? 0) - (a.edition_number ?? 0))
+
+	// Per ogni serie, l'edizione conclusa piu' recente decide chi e' in carica
+	// e quale risultato del giocatore conta ancora nel ranking.
+	const latestBySeries: Record<string, number> = {}
+	events
+		.filter(e => e.status === 'completed')
+		.forEach(e => {
+			if (
+				!(e.series_id in latestBySeries) ||
+				e.edition_number > latestBySeries[e.series_id]
+			) {
+				latestBySeries[e.series_id] = e.edition_number
+			}
+		})
+
+	const reigning: string[] = []
+	const withCurrent = mine.map(r => {
+		const ev = byId.get(r.event_id)!
+		const isCurrent = latestBySeries[ev.series_id] === ev.edition_number
+		if (isCurrent && r.final_rank === 1) reigning.push(ev.name)
+		return { ...r, is_current: isCurrent }
+	})
+
+	return {
+		titles: mine.filter(r => r.final_rank === 1).length,
+		seconds: mine.filter(r => r.final_rank === 2).length,
+		thirds: mine.filter(r => r.final_rank === 3).length,
+		editions_played: mine.length,
+		results: withCurrent,
+		reigning,
+	}
+}
+
+/**
+ * true quando l'errore dice che la sezione 9 dello schema non e' ancora
+ * applicata al database. Serve a far degradare l'app invece di svuotarla:
+ * finche' la migration non gira, il ranking e' semplicemente l'ELO.
+ */
+let missingSchemaWarned = false
+function isMissingEventSchema(error: { code?: string; message?: string } | null): boolean {
+	if (!error) return false
+	// 42P01 = undefined_table, PGRST205 = tabella assente dalla schema cache
+	const missing =
+		error.code === '42P01' ||
+		error.code === 'PGRST205' ||
+		/does not exist|could not find the (table|relation)/i.test(error.message ?? '')
+	if (missing && !missingSchemaWarned) {
+		missingSchemaWarned = true
+		console.warn(
+			'[RankPong] Schema eventi assente: applica la sezione 9 di supabase-schema.sql. ' +
+				'Fino ad allora la sezione Eventi resta vuota e il ranking mostra il solo ELO.'
+		)
+	}
+	return missing
+}
+
+/** Punti evento correnti per giocatore (ramo mock della view ranking). */
+function mockCurrentSeriesPoints(): Record<string, number> {
+	const events = readMock<EventRow>(EV.events)
+	const results = readMock<EventResult>(EV.results)
+	const bySeries = new Map<string, EditionRef[]>()
+	events.forEach(e => {
+		const list = bySeries.get(e.series_id) ?? []
+		list.push({ id: e.id, edition_number: e.edition_number, status: e.status })
+		bySeries.set(e.series_id, list)
+	})
+
+	const out: Record<string, number> = {}
+	bySeries.forEach((editions, seriesId) => {
+		const maxEdition = Math.max(
+			0,
+			...editions.filter(e => e.status === 'completed').map(e => e.edition_number)
+		)
+		const current = defendingPointsFor(
+			editions,
+			results.filter(r => r.series_id === seriesId),
+			maxEdition + 1
+		)
+		Object.entries(current).forEach(([pid, pts]) => (out[pid] = (out[pid] ?? 0) + pts))
+	})
+	return out
 }
 
 // =========================================================================
@@ -413,6 +832,7 @@ export const dbService = {
 					correction_requested_by: match.correction_requested_by ?? null,
 					correction_sets: match.correction_sets ?? null,
 					correction_status: match.correction_status ?? null,
+					event_id: match.event_id ?? null,
 					player1: profiles.find(p => p.id === match.player_1_id),
 					player2: profiles.find(p => p.id === match.player_2_id),
 					creator: profiles.find(p => p.id === match.created_by),
@@ -426,7 +846,8 @@ export const dbService = {
 		player2Id: string,
 		bestOf: 3 | 5,
 		setScores: { set_number: number; score_p1: number; score_p2: number }[],
-		isFriendly: boolean = false
+		isFriendly: boolean = false,
+		eventMatchId?: string
 	): Promise<MatchWithSets> {
 		const currentUser = await this.getCurrentUser()
 		if (!currentUser) throw new Error('Devi essere autenticato per registrare un match')
@@ -467,6 +888,11 @@ export const dbService = {
 
 			if (setsError) throw setsError
 
+			if (eventMatchId) {
+				await this.linkEventMatch(eventMatchId, match.id)
+				match.event_id = match.event_id ?? null
+			}
+
 			return {
 				...match,
 				sets: sets.sort((a, b) => a.set_number - b.set_number),
@@ -493,6 +919,7 @@ export const dbService = {
 				correction_requested_by: null,
 				correction_sets: null,
 				correction_status: null,
+				event_id: null,
 				sets: setScores.map((set, index) => ({
 					id: `set-mock-${index}-${Math.random()}`,
 					match_id: '',
@@ -505,6 +932,14 @@ export const dbService = {
 			newMatch.sets.forEach(s => (s.match_id = newMatch.id))
 			matches.push(newMatch)
 			localStorage.setItem('rp_matches', JSON.stringify(matches))
+
+			if (eventMatchId) {
+				await this.linkEventMatch(eventMatchId, newMatch.id)
+				newMatch.event_id =
+					readMock<EventMatchSlot>(EV.slots).find(x => x.id === eventMatchId)?.event_id ??
+					null
+			}
+
 			return newMatch
 		}
 	},
@@ -888,5 +1323,575 @@ export const dbService = {
 			localStorage.setItem('rp_session', JSON.stringify(profiles[index]))
 			return profiles[index]
 		}
+	},
+	// =====================================================================
+	// EVENTI
+	// =====================================================================
+
+	async getEvents(): Promise<EventRow[]> {
+		if (isSupabaseConfigured && supabase) {
+			const { data: events, error } = await supabase
+				.from('events')
+				.select('*, series:series_id(name)')
+				.order('created_at', { ascending: false })
+			if (error) {
+				if (isMissingEventSchema(error)) return []
+				throw error
+			}
+
+			const { data: parts, error: partsError } = await supabase
+				.from('event_participants')
+				.select('event_id, player_id, status')
+			if (partsError) throw partsError
+
+			const { data: slots, error: slotsError } = await supabase
+				.from('event_matches')
+				.select('event_id, match_id, match:match_id(status)')
+			if (slotsError) throw slotsError
+
+			const me = (await this.getCurrentUser())?.id
+
+			return (events as any[]).map(ev => ({
+				...ev,
+				series_name: ev.series?.name,
+				i_organize: !!me && ev.created_by === me,
+				i_am_in: (parts as any[]).some(
+					x => x.event_id === ev.id && x.player_id === me && x.status === 'accepted'
+				),
+				accepted_count: (parts as any[]).filter(
+					x => x.event_id === ev.id && x.status === 'accepted'
+				).length,
+				matches_total: (slots as any[]).filter(x => x.event_id === ev.id).length,
+				matches_played: (slots as any[]).filter(
+					x => x.event_id === ev.id && x.match?.status === 'confirmed'
+				).length,
+			})) as EventRow[]
+		} else {
+			const events = readMock<EventRow>(EV.events)
+			const series = readMock<EventSeries>(EV.series)
+			const parts = readMock<EventParticipant>(EV.participants)
+			const slots = readMock<EventMatchSlot>(EV.slots)
+			const matches = readMock<MatchWithSets>('rp_matches')
+
+			const me = (await this.getCurrentUser())?.id
+
+			return events
+				.map(ev => ({
+					...ev,
+					series_name: series.find(x => x.id === ev.series_id)?.name,
+					i_organize: !!me && ev.created_by === me,
+					i_am_in: parts.some(
+						x => x.event_id === ev.id && x.player_id === me && x.status === 'accepted'
+					),
+					accepted_count: parts.filter(
+						x => x.event_id === ev.id && x.status === 'accepted'
+					).length,
+					matches_total: slots.filter(x => x.event_id === ev.id).length,
+					matches_played: slots.filter(
+						x =>
+							x.event_id === ev.id &&
+							matches.find(m => m.id === x.match_id)?.status === 'confirmed'
+					).length,
+				}))
+				.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+		}
+	},
+
+	async getEvent(eventId: string): Promise<EventDetail> {
+		const profiles = await this.getProfiles()
+		const eloById: Record<string, number> = {}
+		profiles.forEach(p => (eloById[p.id] = p.elo_rating))
+		const allMatches = await this.getMatches()
+
+		let event: EventRow
+		let participants: EventParticipant[]
+		let slots: EventMatchSlot[]
+		let standings: StandingRow[]
+		let seriesEvents: { id: string; edition_number: number; status: string }[]
+		let seriesResults: EventResult[]
+
+		if (isSupabaseConfigured && supabase) {
+			const { data: ev, error } = await supabase
+				.from('events')
+				.select('*, series:series_id(name)')
+				.eq('id', eventId)
+				.single()
+			if (error) throw error
+			event = { ...(ev as any), series_name: (ev as any).series?.name }
+
+			const { data: parts, error: pErr } = await supabase
+				.from('event_participants')
+				.select('*')
+				.eq('event_id', eventId)
+			if (pErr) throw pErr
+			participants = parts as EventParticipant[]
+
+			const { data: rawSlots, error: sErr } = await supabase
+				.from('event_matches')
+				.select('*')
+				.eq('event_id', eventId)
+				.order('position', { ascending: true })
+			if (sErr) throw sErr
+			slots = rawSlots as EventMatchSlot[]
+
+			const { data: rawStandings, error: stErr } = await supabase.rpc('event_standings', {
+				event_id_param: eventId,
+			})
+			if (stErr) throw stErr
+			standings = (rawStandings as any[])
+				.map(r => ({
+					player_id: r.player_id,
+					position: r.rank_position,
+					played: r.played,
+					wins: r.wins,
+					losses: r.losses,
+					sets_won: r.sets_won,
+					sets_lost: r.sets_lost,
+					set_diff: r.set_diff,
+					point_diff: r.point_diff,
+				}))
+				.sort((a, b) => a.position - b.position)
+
+			const { data: sEvents, error: seErr } = await supabase
+				.from('events')
+				.select('id, edition_number, status')
+				.eq('series_id', event.series_id)
+			if (seErr) throw seErr
+			seriesEvents = sEvents as any[]
+
+			const { data: sResults, error: srErr } = await supabase
+				.from('event_results')
+				.select('*')
+				.eq('series_id', event.series_id)
+			if (srErr) throw srErr
+			seriesResults = sResults as EventResult[]
+		} else {
+			const events = readMock<EventRow>(EV.events)
+			const found = events.find(e => e.id === eventId)
+			if (!found) throw new Error('Evento non trovato')
+			const series = readMock<EventSeries>(EV.series)
+			event = { ...found, series_name: series.find(x => x.id === found.series_id)?.name }
+
+			participants = readMock<EventParticipant>(EV.participants).filter(
+				x => x.event_id === eventId
+			)
+			slots = readMock<EventMatchSlot>(EV.slots)
+				.filter(x => x.event_id === eventId)
+				.sort((a, b) => a.position - b.position)
+
+			standings = computeStandings(
+				participants.filter(x => x.status === 'accepted').map(x => x.player_id),
+				allMatches.filter(m => slots.some(sl => sl.match_id === m.id)),
+				eloById
+			)
+
+			seriesEvents = events
+				.filter(e => e.series_id === event.series_id)
+				.map(e => ({ id: e.id, edition_number: e.edition_number, status: e.status }))
+			seriesResults = readMock<EventResult>(EV.results).filter(
+				r => r.series_id === event.series_id
+			)
+		}
+
+		const defending = defendingPointsFor(seriesEvents, seriesResults, event.edition_number)
+		const profileById = new Map(profiles.map(p => [p.id, p]))
+
+		return {
+			...event,
+			accepted_count: participants.filter(x => x.status === 'accepted').length,
+			matches_total: slots.length,
+			matches_played: slots.filter(
+				sl => allMatches.find(m => m.id === sl.match_id)?.status === 'confirmed'
+			).length,
+			participants: participants.map(x => ({ ...x, player: profileById.get(x.player_id) })),
+			slots: slots.map(sl => ({
+				...sl,
+				player1: profileById.get(sl.player_1_id),
+				player2: profileById.get(sl.player_2_id),
+				match: allMatches.find(m => m.id === sl.match_id),
+			})),
+			standings: withProjection(
+				standings.map(r => ({ ...r, player: profileById.get(r.player_id) })),
+				event.ranking_points,
+				defending
+			),
+		}
+	},
+
+	async createEvent(params: {
+		seriesName: string
+		eventName: string
+		participantsCount: number
+		bestOf: 3 | 5
+		countsForElo: boolean
+		points?: Record<string, number>
+		deadline?: string | null
+	}): Promise<string> {
+		const currentUser = await this.getCurrentUser()
+		if (!currentUser) throw new Error('Devi essere autenticato')
+
+		const points = params.points ?? defaultEventPoints(params.participantsCount)
+
+		if (isSupabaseConfigured && supabase) {
+			const { data, error } = await supabase.rpc('create_event', {
+				series_name: params.seriesName,
+				event_name: params.eventName,
+				participants_count_param: params.participantsCount,
+				best_of_param: params.bestOf,
+				counts_for_elo_param: params.countsForElo,
+				points_param: points,
+				deadline_param: params.deadline ?? null,
+			})
+			if (error) throw error
+			return data as string
+		} else {
+			const series = readMock<EventSeries>(EV.series)
+			let seriesRow = series.find(x => x.name === params.seriesName)
+			if (!seriesRow) {
+				seriesRow = {
+					id: mockId('series'),
+					name: params.seriesName,
+					format: 'round_robin',
+					default_points: points,
+					created_by: currentUser.id,
+					created_at: new Date().toISOString(),
+				}
+				series.push(seriesRow)
+				writeMock(EV.series, series)
+			}
+
+			const events = readMock<EventRow>(EV.events)
+			const nextEdition =
+				Math.max(
+					0,
+					...events.filter(e => e.series_id === seriesRow.id).map(e => e.edition_number)
+				) + 1
+
+			const newEvent: EventRow = {
+				id: mockId('event'),
+				series_id: seriesRow.id,
+				edition_number: nextEdition,
+				name: params.eventName,
+				status: 'open',
+				participants_count: params.participantsCount,
+				best_of: params.bestOf,
+				counts_for_elo: params.countsForElo,
+				ranking_points: points,
+				registration_deadline: params.deadline ?? null,
+				started_at: null,
+				completed_at: null,
+				created_by: currentUser.id,
+				created_at: new Date().toISOString(),
+			}
+			events.push(newEvent)
+			writeMock(EV.events, events)
+
+			const parts = readMock<EventParticipant>(EV.participants)
+			parts.push({
+				id: mockId('part'),
+				event_id: newEvent.id,
+				player_id: currentUser.id,
+				status: 'accepted',
+				joined_at: new Date().toISOString(),
+			})
+			writeMock(EV.participants, parts)
+
+			return newEvent.id
+		}
+	},
+
+	/** Iscrizione diretta: nessuna approvazione, si entra subito. */
+	async applyToEvent(eventId: string): Promise<void> {
+		const currentUser = await this.getCurrentUser()
+		if (!currentUser) throw new Error('Devi essere autenticato')
+
+		if (isSupabaseConfigured && supabase) {
+			const { error } = await supabase.rpc('apply_to_event', { event_id_param: eventId })
+			if (error) throw error
+		} else {
+			const events = readMock<EventRow>(EV.events)
+			const ev = events.find(e => e.id === eventId)
+			if (!ev) throw new Error('Evento non trovato')
+			if (ev.status !== 'open') throw new Error('Le iscrizioni sono chiuse')
+
+			const parts = readMock<EventParticipant>(EV.participants)
+			const accepted = parts.filter(
+				x => x.event_id === eventId && x.status === 'accepted'
+			).length
+			if (accepted >= ev.participants_count) {
+				throw new Error('Non ci sono più posti disponibili')
+			}
+
+			const existing = parts.find(
+				x => x.event_id === eventId && x.player_id === currentUser.id
+			)
+			if (existing) {
+				existing.status = 'accepted'
+			} else {
+				parts.push({
+					id: mockId('part'),
+					event_id: eventId,
+					player_id: currentUser.id,
+					status: 'accepted',
+					joined_at: new Date().toISOString(),
+				})
+			}
+			writeMock(EV.participants, parts)
+		}
+	},
+
+	async startEvent(eventId: string): Promise<void> {
+		const currentUser = await this.getCurrentUser()
+		if (!currentUser) throw new Error('Devi essere autenticato')
+
+		if (isSupabaseConfigured && supabase) {
+			const { error } = await supabase.rpc('start_event', { event_id_param: eventId })
+			if (error) throw error
+		} else {
+			const events = readMock<EventRow>(EV.events)
+			const ev = events.find(e => e.id === eventId)
+			if (!ev) throw new Error('Evento non trovato')
+			if (ev.created_by !== currentUser.id) {
+				throw new Error("Solo l'organizzatore può avviare l'evento")
+			}
+			if (ev.status !== 'open') throw new Error("L'evento è già stato avviato")
+
+			const parts = readMock<EventParticipant>(EV.participants)
+			const roster = parts
+				.filter(x => x.event_id === eventId && x.status === 'accepted')
+				.sort((a, b) => new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime())
+				.map(x => x.player_id)
+
+			if (roster.length < 4) {
+				throw new Error("Servono almeno 4 giocatori per avviare l'evento")
+			}
+
+			const slots = readMock<EventMatchSlot>(EV.slots)
+			generateRoundRobinPairings(roster).forEach(pair => {
+				slots.push({
+					id: mockId('slot'),
+					event_id: eventId,
+					match_id: null,
+					player_1_id: pair.p1,
+					player_2_id: pair.p2,
+					position: pair.position,
+				})
+			})
+			writeMock(EV.slots, slots)
+
+			ev.status = 'in_progress'
+			ev.participants_count = roster.length
+			ev.started_at = new Date().toISOString()
+			writeMock(EV.events, events)
+		}
+	},
+
+	async linkEventMatch(eventMatchId: string, matchId: string): Promise<void> {
+		if (isSupabaseConfigured && supabase) {
+			const { error } = await supabase.rpc('link_event_match', {
+				event_match_id_param: eventMatchId,
+				match_id_param: matchId,
+			})
+			if (error) throw error
+		} else {
+			const slots = readMock<EventMatchSlot>(EV.slots)
+			const slot = slots.find(x => x.id === eventMatchId)
+			if (!slot) throw new Error('Slot non trovato')
+			if (slot.match_id) throw new Error('Questa partita è già stata registrata')
+
+			const matches = readMock<MatchWithSets>('rp_matches')
+			const m = matches.find(x => x.id === matchId)
+			if (!m) throw new Error('Match non trovato')
+
+			const ok =
+				(m.player_1_id === slot.player_1_id && m.player_2_id === slot.player_2_id) ||
+				(m.player_1_id === slot.player_2_id && m.player_2_id === slot.player_1_id)
+			if (!ok) throw new Error('I giocatori non corrispondono allo slot')
+
+			slot.match_id = matchId
+			writeMock(EV.slots, slots)
+
+			m.event_id = slot.event_id
+			writeMock('rp_matches', matches)
+		}
+	},
+
+	async closeEvent(eventId: string): Promise<void> {
+		const currentUser = await this.getCurrentUser()
+		if (!currentUser) throw new Error('Devi essere autenticato')
+
+		if (isSupabaseConfigured && supabase) {
+			const { error } = await supabase.rpc('close_event', { event_id_param: eventId })
+			if (error) throw error
+		} else {
+			const events = readMock<EventRow>(EV.events)
+			const ev = events.find(e => e.id === eventId)
+			if (!ev) throw new Error('Evento non trovato')
+			if (ev.created_by !== currentUser.id) {
+				throw new Error("Solo l'organizzatore può chiudere l'evento")
+			}
+			if (ev.status !== 'in_progress') throw new Error("L'evento non è in corso")
+
+			const slots = readMock<EventMatchSlot>(EV.slots).filter(x => x.event_id === eventId)
+			const allMatches = await this.getMatches()
+			const played = slots.filter(
+				sl => allMatches.find(m => m.id === sl.match_id)?.status === 'confirmed'
+			).length
+			if (played < slots.length) {
+				throw new Error(`Mancano ancora ${slots.length - played} partite da giocare`)
+			}
+
+			const profiles = await this.getProfiles()
+			const eloById: Record<string, number> = {}
+			profiles.forEach(p => (eloById[p.id] = p.elo_rating))
+
+			const roster = readMock<EventParticipant>(EV.participants)
+				.filter(x => x.event_id === eventId && x.status === 'accepted')
+				.map(x => x.player_id)
+
+			const standings = computeStandings(
+				roster,
+				allMatches.filter(m => slots.some(sl => sl.match_id === m.id)),
+				eloById
+			)
+
+			const results = readMock<EventResult>(EV.results).filter(r => r.event_id !== eventId)
+			standings.forEach(row => {
+				results.push({
+					id: mockId('res'),
+					event_id: eventId,
+					series_id: ev.series_id,
+					player_id: row.player_id,
+					final_rank: row.position,
+					ranking_points: ev.ranking_points[String(row.position)] ?? 0,
+					awarded_at: new Date().toISOString(),
+				})
+			})
+			writeMock(EV.results, results)
+
+			ev.status = 'completed'
+			ev.completed_at = new Date().toISOString()
+			writeMock(EV.events, events)
+		}
+	},
+
+	/** Il ranking unico: ELO delle partite + punti evento correnti. */
+	async getRanking(): Promise<RankingRow[]> {
+		if (isSupabaseConfigured && supabase) {
+			const { data, error } = await supabase
+				.from('ranking')
+				.select('*')
+				.order('total_points', { ascending: false })
+
+			if (error) {
+				if (!isMissingEventSchema(error)) throw error
+				// Sezione 9 non ancora applicata: il ranking e' il solo ELO.
+				const profiles = await this.getProfiles()
+				return profiles.map(p => ({
+					...p,
+					event_points: 0,
+					total_points: p.elo_rating,
+				}))
+			}
+
+			return data as RankingRow[]
+		} else {
+			const profiles = await this.getProfiles()
+			const eventPoints = mockCurrentSeriesPoints()
+			return profiles
+				.map(p => ({
+					...p,
+					event_points: eventPoints[p.id] ?? 0,
+					total_points: p.elo_rating + (eventPoints[p.id] ?? 0),
+				}))
+				.sort((a, b) => b.total_points - a.total_points)
+		}
+	},
+
+	async getPalmares(playerId: string): Promise<Palmares> {
+		if (isSupabaseConfigured && supabase) {
+			const { data: results, error } = await supabase
+				.from('event_results')
+				.select('*')
+				.eq('player_id', playerId)
+			if (error) {
+				if (isMissingEventSchema(error)) {
+					return {
+						titles: 0,
+						seconds: 0,
+						thirds: 0,
+						editions_played: 0,
+						results: [],
+						reigning: [],
+					}
+				}
+				throw error
+			}
+
+			const { data: events, error: evError } = await supabase
+				.from('events')
+				.select('id, name, edition_number, status, series_id')
+			if (evError) throw evError
+
+			return buildPalmares(playerId, results as EventResult[], events as any[])
+		} else {
+			const results = readMock<EventResult>(EV.results)
+			const events = readMock<EventRow>(EV.events).map(e => ({
+				id: e.id,
+				name: e.name,
+				edition_number: e.edition_number,
+				status: e.status,
+				series_id: e.series_id,
+			}))
+			return buildPalmares(playerId, results, events)
+		}
+	},
+
+	/** Tutti i risultati d'evento con il nome del giocatore, per le card della lista. */
+	async getEventResultsSummary(): Promise<EventResult[]> {
+		const profiles = await this.getProfiles()
+		const nameById = new Map(profiles.map(p => [p.id, p.display_name]))
+
+		let results: EventResult[]
+		if (isSupabaseConfigured && supabase) {
+			const { data, error } = await supabase.from('event_results').select('*')
+			if (error) {
+				if (isMissingEventSchema(error)) return []
+				throw error
+			}
+			results = data as EventResult[]
+		} else {
+			results = readMock<EventResult>(EV.results)
+		}
+
+		return results.map(r => ({ ...r, player_name: nameById.get(r.player_id) }))
+	},
+
+	/**
+	 * Proiezione della difesa per l'utente corrente sulle edizioni in corso:
+	 * serve alla striscia in fondo alle card della lista.
+	 */
+	async getMyProjections(): Promise<
+		Record<string, { position: number; defending: number; projected: number }>
+	> {
+		const currentUser = await this.getCurrentUser()
+		if (!currentUser) return {}
+
+		const events = await this.getEvents()
+		const inProgress = events.filter(e => e.status === 'in_progress')
+		const out: Record<string, { position: number; defending: number; projected: number }> = {}
+
+		for (const ev of inProgress) {
+			const detail = await this.getEvent(ev.id)
+			const mine = detail.standings.find(r => r.player_id === currentUser.id)
+			if (!mine) continue
+			out[ev.id] = {
+				position: mine.position,
+				defending: mine.defending_points ?? 0,
+				projected: mine.projected_points ?? 0,
+			}
+		}
+
+		return out
 	},
 }

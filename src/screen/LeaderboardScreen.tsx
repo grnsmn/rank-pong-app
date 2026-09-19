@@ -1,6 +1,6 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
-import { dbService, type Profile } from '../services/db'
+import { dbService, type RankingRow } from '../services/db'
 import { useDataFetch } from '../hooks/useDataFetch'
 import { useSearch } from '../hooks/useSearch'
 import { Trophy, Medal, Search, User } from 'lucide-react'
@@ -14,7 +14,7 @@ interface Props {
 export const LeaderboardScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 	const { t } = useTranslation()
 
-	const { data, isLoading } = useDataFetch(() => dbService.getProfiles(), {
+	const { data, isLoading } = useDataFetch(() => dbService.getRanking(), {
 		refetchOnFocus: true,
 	})
 	const profiles = data ?? []
@@ -23,7 +23,7 @@ export const LeaderboardScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 		search,
 		setSearch,
 		filtered: filteredProfiles,
-	} = useSearch<Profile>(
+	} = useSearch<RankingRow>(
 		profiles,
 		(p, q) => p.display_name.toLowerCase().includes(q) || p.username.toLowerCase().includes(q)
 	)
@@ -78,6 +78,23 @@ export const LeaderboardScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 					{t('leaderboard.title')}
 				</h2>
 				<p className="text-xs text-slate-400">{t('leaderboard.subtitle')}</p>
+			</div>
+
+			{/* Il ranking non e' piu' solo ELO: rendiamo esplicita la somma */}
+			<div className="px-4 pt-2.5 pb-1">
+				<div className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-slate-950/60">
+					<span className="text-[10px] font-bold text-primary">
+						{t('leaderboard.legendElo')}
+					</span>
+					<span className="text-[11px] font-extrabold text-slate-600">+</span>
+					<span className="text-[10px] font-bold text-indigo-400">
+						{t('leaderboard.legendEvents')}
+					</span>
+					<span className="text-[11px] font-extrabold text-slate-600">=</span>
+					<span className="text-[10px] font-bold text-slate-200">
+						{t('leaderboard.legendTotal')}
+					</span>
+				</div>
 			</div>
 
 			<div className="px-4 py-2">
@@ -148,8 +165,21 @@ export const LeaderboardScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 									</div>
 									<div className="flex flex-col items-end shrink-0">
 										{getPlayerTypeLabel(player.player_type)}
-										<span className="text-sm font-extrabold text-primary">
-											{player.elo_rating} {t('common.elo')}
+										<span className="text-sm font-extrabold text-slate-100">
+											{player.total_points}
+										</span>
+										<span className="text-[9px] text-slate-500">
+											{player.elo_rating}
+											{' + '}
+											<span
+												className={
+													player.event_points > 0
+														? 'text-indigo-400'
+														: 'text-slate-600'
+												}
+											>
+												{player.event_points}
+											</span>
 										</span>
 									</div>
 								</div>

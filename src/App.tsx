@@ -11,20 +11,22 @@ import { LeaderboardScreen } from './screen/LeaderboardScreen'
 import { MatchesScreen } from './screen/Matches/MatchesScreen'
 import { NewMatchScreen } from './screen/NewMatch/NewMatchScreen'
 import { ProfileScreen } from './screen/ProfileScreen'
+import { EventsScreen } from './screen/Events/EventsScreen'
 import { PlayerProfileScreen } from './screen/PlayerProfileScreen'
 import { PingPongLoader } from './components/PingPongLoader'
 
 // Icone
-import { Trophy, History, PlusCircle, User, Info } from 'lucide-react'
+import { Trophy, History, PlusCircle, Swords, User, Info } from 'lucide-react'
 
 export const App: React.FC = () => {
 	const { t } = useTranslation()
 	const { currentUser, initialize, isLoading, recoveryMode } = useAppStore()
-	const [activeTab, setActiveTab] = useState<'leaderboard' | 'matches' | 'new-match' | 'profile'>(
-		'leaderboard'
-	)
+	const [activeTab, setActiveTab] = useState<
+		'leaderboard' | 'matches' | 'new-match' | 'events' | 'profile'
+	>('leaderboard')
 	const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
 	const [pendingCount, setPendingCount] = useState(0)
+	const [eventCount, setEventCount] = useState(0)
 	const [hideBanner, setHideBanner] = useState(false)
 
 	// Inizializza sessione all'avvio
@@ -51,6 +53,19 @@ export const App: React.FC = () => {
 					(m.player_1_id === currentUser.id || m.player_2_id === currentUser.id)
 			).length
 			setPendingCount(pendingMatches + pendingCorrections)
+
+			const events = await dbService.getEvents()
+			let matchesToPlay = 0
+			for (const event of events.filter(e => e.status === 'in_progress')) {
+				const detail = await dbService.getEvent(event.id)
+				matchesToPlay += detail.slots.filter(
+					slot =>
+						!slot.match &&
+						(slot.player_1_id === currentUser.id || slot.player_2_id === currentUser.id)
+				).length
+			}
+
+			setEventCount(matchesToPlay)
 		} catch (err) {
 			console.error('Errore conteggio notifiche:', err)
 		}
@@ -101,6 +116,8 @@ export const App: React.FC = () => {
 				return <MatchesScreen onPlayerSelect={id => setSelectedPlayerId(id)} />
 			case 'new-match':
 				return <NewMatchScreen />
+			case 'events':
+				return <EventsScreen onPlayerSelect={id => setSelectedPlayerId(id)} />
 			case 'profile':
 				return <ProfileScreen />
 			default:
@@ -131,7 +148,7 @@ export const App: React.FC = () => {
 			<div className="flex-1 overflow-hidden">{renderContent()}</div>
 
 			<div className="absolute bottom-0 left-0 right-0 bg-neutral/95 backdrop-blur-md border-t border-slate-800/80 px-2 py-2 shrink-0 z-40">
-				<div className="grid grid-cols-4 items-center justify-around">
+				<div className="grid grid-cols-5 items-center justify-around">
 					<button
 						onClick={() => {
 							setSelectedPlayerId(null)
@@ -184,6 +201,28 @@ export const App: React.FC = () => {
 							className={`w-5 h-5 ${activeTab === 'new-match' ? 'fill-primary/10' : ''}`}
 						/>
 						<span className="text-[10px] font-bold mt-1">{t('nav.newMatch')}</span>
+					</button>
+
+					<button
+						onClick={() => {
+							setSelectedPlayerId(null)
+							setActiveTab('events')
+						}}
+						className={`flex flex-col items-center justify-center py-1 relative transition-colors ${
+							activeTab === 'events'
+								? 'text-indigo-400'
+								: 'text-slate-400 hover:text-slate-200'
+						}`}
+					>
+						<Swords
+							className={`w-5 h-5 ${activeTab === 'events' ? 'fill-indigo-400/10' : ''}`}
+						/>
+						<span className="text-[10px] font-bold mt-1">{t('nav.events')}</span>
+						{eventCount > 0 && (
+							<span className="absolute top-0 right-3 badge badge-error badge-xs text-white font-black w-4 h-4 flex items-center justify-center p-0.5 text-[8px] animate-pulse">
+								{eventCount}
+							</span>
+						)}
 					</button>
 
 					<button

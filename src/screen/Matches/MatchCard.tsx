@@ -1,6 +1,6 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
-import { Calendar, Clock, Pencil, Handshake, Trophy, ShieldAlert } from 'lucide-react'
+import { Calendar, Clock, Pencil, Handshake, Trophy, ShieldAlert, Swords } from 'lucide-react'
 import type { MatchWithSets } from '../../services/db'
 import { getSetsScore, isMyMatch, canRequestCorrection } from './matchHelpers'
 import { InfoTooltip } from '../../components/InfoTooltip'
@@ -102,6 +102,12 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 							</span>
 						)}
 						{typeBadge}
+						{match.event_id && (
+							<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 text-[9px] font-bold uppercase tracking-wide">
+								<Swords className="w-2.5 h-2.5" />
+								{t('events.badgeEvent')}
+							</span>
+						)}
 					</span>
 					<span className="flex items-center gap-1">
 						<Calendar className="w-3 h-3" />
