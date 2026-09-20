@@ -193,6 +193,46 @@ history is not recorded correctly and pushing would try to recreate existing tab
 
 ---
 
+## Task A-bis — Add a SECOND environment to an existing setup
+
+Use this when the repo already has migrations pulled from one project (DEV) and a second project
+(PROD) is now being brought into the same workflow. It is **not** a repeat of Task A.
+
+**Do not run `db pull` for the second project.** It would generate a second baseline file
+describing the same schema, while each project's history table knows only its own. The other
+project's baseline would then show as local-and-unapplied, and `db push` would try to run it —
+recreating existing tables against live data. `supabase/migrations/` is a single shared
+history: both projects must converge on the same files.
+
+1. Link the second project (user-run). This replaces the previous link — from here on, every
+   command targets the new project. Say so explicitly, and confirm with
+   `cat supabase/.temp/project-ref` before anything else.
+
+2. Back up the second project first — it is the one with real users. Same verification as A2.
+
+3. Compare its schema against the existing baseline, using the dump from step 2 rather than a
+   `db pull`. Normalise before diffing: the two files come from the same generator, but object
+   ordering and grants can still differ harmlessly. Compare the **set of objects** — tables,
+   columns, functions, policies, triggers, indexes — not the raw text.
+
+4. **If the schemas are equivalent**, record the existing baseline as applied on the second
+   project, creating no new file (user-run):
+
+```bash
+supabase migration repair --status applied <existing_baseline_version>
+```
+
+5. **If they diverge**, stop and report every difference. Divergence means the two projects
+   drifted apart while changes were being pasted by hand, and reconciling them is the user's
+   decision: bring one up to the other with a migration, or accept the difference and record it.
+   Never paper over it by pulling a second baseline.
+
+6. Verify exactly as in A4/A5: `migration list` must show the same single version on both LOCAL
+   and REMOTE, and `db push --dry-run` must report nothing to apply.
+
+From this point the two projects share one history. A new migration is written once, pushed to
+DEV first, and pushed to PROD only once it has proven itself there.
+
 ## Task B — Write a new migration
 
 Whenever a feature or fix needs a schema change.
