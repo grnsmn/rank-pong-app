@@ -259,7 +259,16 @@ supabase db push --dry-run
 supabase db push
 ```
 
-5. Commit the migration file in the same commit as the code that depends on it.
+5. **Verify the effect, not the history row.** A version appearing in
+   `supabase_migrations.schema_migrations` is not proof that its SQL ran. Observed on
+   CLI 2.117: two migrations that were no-ops against one project (dropping a function absent
+   there, setting a default already at that value) ended up recorded as applied on it without
+   ever being pushed to it — plausibly because the diff engine judged them already satisfied,
+   though that was not confirmed. Harmless for a no-op, serious for a real change. After a push,
+   confirm the migration actually did what it claims: re-dump the target schema and check for
+   the object, column, default or policy the migration was supposed to change.
+
+6. Commit the migration file in the same commit as the code that depends on it.
 
 ### Migration writing conventions
 
