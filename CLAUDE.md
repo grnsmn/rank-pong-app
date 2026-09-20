@@ -17,7 +17,10 @@ src/
   services/db.ts    # All DB methods (Supabase + localStorage mock)
   store/            # Zustand store
   i18n/locales/it.ts  # All UI strings
-supabase-schema.sql # Full schema + triggers + RPC functions
+supabase/
+  config.toml       # Supabase CLI project config
+  migrations/       # Versioned schema changes (source of truth)
+supabase-schema.sql # Frozen baseline: schema as of migration adoption
 ```
 
 ## Development rules
@@ -46,9 +49,20 @@ Never hardcode Italian text directly in components.
 
 Supabase RPC functions (security definer) bypass RLS: use them for atomic multi-table operations (e.g. approving a correction with Elo recalculation).
 
-### SQL schema
+### SQL schema — migrations, not the SQL Editor
 
-Schema changes always get appended to the bottom of `supabase-schema.sql` as a new numbered, commented section. Don't modify existing sections (1-4), add new ones (5, 6, ...).
+Schema changes are **versioned migration files in the repo**, applied with the Supabase CLI. They are no longer pasted into the dashboard SQL Editor by hand.
+
+- `supabase-schema.sql` is a **frozen historical baseline** (sections 1-9). Don't append to it and don't modify it — it records the schema as it stood when migrations were adopted.
+- Every new change is its own file under `supabase/migrations/`, created with `supabase migration new <short_snake_case_name>` and applied with `supabase db push`.
+- A migration file, once pushed, is **immutable**. Correct a mistake with a new migration, never by editing the old one.
+- Write **idempotent SQL** (`create table if not exists`, `create or replace function`, `drop trigger if exists` before `create trigger`, `add column if not exists`) — same style as the existing sections.
+- **Additive first, destructive much later.** The frontend is a SPA: users keep running the previously loaded bundle after a deploy. To rename or remove a column, add the new one and ship the frontend first, then drop the old one in a later migration.
+- Commit the migration file in the same commit as the code that depends on it.
+
+Full procedure — first-time setup, writing a migration, and repairing an out-of-sync history — lives in the `supabase-migrations` skill (`.claude/skills/supabase-migrations/SKILL.md`). Invoke it for any schema work; it also carries the safety rules for operating against the production database.
+
+**Never run `supabase db reset` against the remote project** — it drops all user data. Resets are `--local` only.
 
 ## Component architecture — progressive decomposition
 

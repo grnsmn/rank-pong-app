@@ -5,6 +5,11 @@
 .env.development
 .env.production
 
+# Database dumps (contain user data — never commit)
+backup_*.sql
+*_backup_*.sql
+*.dump.sql
+
 # Logs
 logs
 *.log
