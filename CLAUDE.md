@@ -59,6 +59,8 @@ Schema changes are **versioned migration files in the repo**, applied with the S
 - Write **idempotent SQL** (`create table if not exists`, `create or replace function`, `drop trigger if exists` before `create trigger`, `add column if not exists`) — same style as the existing sections.
 - **Additive first, destructive much later.** The frontend is a SPA: users keep running the previously loaded bundle after a deploy. To rename or remove a column, add the new one and ship the frontend first, then drop the old one in a later migration.
 - Commit the migration file in the same commit as the code that depends on it.
+- **Commit before applying; push to `origin` before applying to production.** `db push` records only the migration's _version_ in the remote history table, never its SQL — so a migration applied but not committed leaves a database claiming to have run something whose source exists nowhere. Pushing to `origin` before touching production means production never holds changes that only one machine knows about.
+- **Two projects, one shared history.** DEV and PROD both draw from `supabase/migrations/`. A migration is pushed to DEV first, verified there, and only then pushed to PROD. Switching target means re-running `supabase link` — always check `cat supabase/.temp/project-ref` before a push and state which project it resolves to.
 
 Full procedure — first-time setup, writing a migration, and repairing an out-of-sync history — lives in the `supabase-migrations` skill (`.claude/skills/supabase-migrations/SKILL.md`). Invoke it for any schema work; it also carries the safety rules for operating against the production database.
 
