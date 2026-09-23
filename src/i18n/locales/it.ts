@@ -282,6 +282,7 @@ const it = {
 		filterInProgress: 'In corso',
 		filterOpen: 'Aperti',
 		filterCompleted: 'Conclusi',
+		filterCancelled: 'Annullati',
 		filterOnlyMine: 'Solo i miei',
 		filterClear: 'Azzera',
 		searchPlaceholder: 'Cerca evento...',
