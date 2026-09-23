@@ -67,6 +67,10 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack, onPlayerSe
 	const mine = myStanding(event.standings, currentUser?.id)
 	const accepted = event.participants.filter(p => p.status === 'accepted')
 	const completed = event.status === 'completed'
+	const cancelled = event.status === 'cancelled'
+	// Solo un'edizione in corso accetta risultati: conclusa i punti sono gia'
+	// assegnati, annullata non ne assegnera' mai.
+	const acceptsResults = event.status === 'in_progress'
 	// Senza risultati la classifica non dice nulla: l'ordine e' solo spareggio ELO.
 	const hasResults = (event.matches_played ?? 0) > 0
 
@@ -160,6 +164,15 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack, onPlayerSe
 				{actionError && (
 					<div className="alert alert-error text-sm py-2 px-3 shadow-md">
 						<span>{actionError}</span>
+					</div>
+				)}
+
+				{cancelled && (
+					<div className="flex items-center gap-2.5 p-3.5 rounded-2xl bg-error/[0.08] border border-error/30">
+						<Ban className="w-4 h-4 text-error shrink-0" />
+						<span className="text-xs leading-snug text-error/90">
+							{t('events.cancelledBanner')}
+						</span>
 					</div>
 				)}
 
@@ -320,7 +333,8 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack, onPlayerSe
 							<StandingsTable
 								standings={event.standings}
 								currentUserId={currentUser?.id}
-								hasResults={hasResults}
+								showProjection={!cancelled}
+								hasResults={hasResults && !cancelled}
 								onPlayerSelect={onPlayerSelect}
 							/>
 						</div>
@@ -333,14 +347,21 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack, onPlayerSe
 						currentUserId={currentUser?.id}
 						bestOf={event.best_of}
 						isActing={isActing}
-						onRecord={completed ? undefined : slot => openRecord(slot)}
-						onConfirm={slot =>
-							runAction(async () => {
-								await dbService.confirmMatchAsPlayer(slot.match_id!)
-								await refreshProfile()
-							})
+						onRecord={acceptsResults ? slot => openRecord(slot) : undefined}
+						onConfirm={
+							acceptsResults
+								? slot =>
+										runAction(async () => {
+											await dbService.confirmMatchAsPlayer(slot.match_id!)
+											await refreshProfile()
+										})
+								: undefined
 						}
-						onReject={slot => runAction(() => dbService.rejectEventMatch(slot.id))}
+						onReject={
+							acceptsResults
+								? slot => runAction(() => dbService.rejectEventMatch(slot.id))
+								: undefined
+						}
 					/>
 				)}
 

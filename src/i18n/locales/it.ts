@@ -303,6 +303,7 @@ const it = {
 		leave: 'Esci',
 		leaveConfirm: 'Vuoi uscire da questo evento? Il tuo posto torna libero.',
 		cancelEvent: 'Annulla edizione',
+		cancelledBanner: 'Edizione annullata: non assegna punti e non accetta nuovi risultati.',
 		cancelConfirm:
 			"Vuoi annullare questa edizione? Non assegnerà punti e nessuno potrà più registrare risultati. L'operazione non si può annullare.",
 		projectionFirst: "Sei primo nell'edizione",
