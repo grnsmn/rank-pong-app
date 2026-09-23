@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Check, Crown, LogOut, Trophy, Zap } from 'lucide-react'
+import { ArrowLeft, Ban, Check, Crown, LogOut, Trophy, Zap } from 'lucide-react'
 import { dbService, type EventMatchSlot } from '../../services/db'
 import { useAppStore } from '../../store/useAppStore'
 import { useDataFetch } from '../../hooks/useDataFetch'
@@ -382,6 +382,23 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack, onPlayerSe
 						</span>
 					</div>
 				</div>
+
+				{/* Annullamento: solo l'organizzatore, e solo finche' i punti non
+				    sono stati assegnati. Da 'completed' l'RPC rifiuta comunque. */}
+				{organizer && (event.status === 'open' || event.status === 'in_progress') && (
+					<button
+						onClick={() => {
+							if (window.confirm(t('events.cancelConfirm'))) {
+								runAction(() => dbService.cancelEvent(event.id))
+							}
+						}}
+						disabled={isActing}
+						className="btn btn-ghost w-full font-bold rounded-2xl border border-error/40 bg-error/5 text-error hover:bg-error/15"
+					>
+						<Ban className="w-4 h-4" />
+						{t('events.cancelEvent')}
+					</button>
+				)}
 			</div>
 
 			{recordSlot && (

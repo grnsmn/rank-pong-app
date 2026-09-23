@@ -1783,6 +1783,32 @@ export const dbService = {
 		}
 	},
 
+	async cancelEvent(eventId: string): Promise<void> {
+		const currentUser = await this.getCurrentUser()
+		if (!currentUser) throw new Error('Devi essere autenticato')
+
+		if (isSupabaseConfigured && supabase) {
+			const { error } = await supabase.rpc('cancel_event', { event_id_param: eventId })
+			if (error) throw error
+		} else {
+			const events = readMock<EventRow>(EV.events)
+			const ev = events.find(e => e.id === eventId)
+			if (!ev) throw new Error('Evento non trovato')
+			if (ev.created_by !== currentUser.id) {
+				throw new Error("Solo l'organizzatore può annullare l'evento")
+			}
+			if (ev.status === 'cancelled') return
+			if (ev.status === 'completed') {
+				throw new Error(
+					"Un'edizione conclusa non si può annullare: i punti sono già assegnati"
+				)
+			}
+
+			ev.status = 'cancelled'
+			writeMock(EV.events, events)
+		}
+	},
+
 	async startEvent(eventId: string): Promise<void> {
 		const currentUser = await this.getCurrentUser()
 		if (!currentUser) throw new Error('Devi essere autenticato')

@@ -302,6 +302,9 @@ const it = {
 		alreadyIn: 'Sei iscritto',
 		leave: 'Esci',
 		leaveConfirm: 'Vuoi uscire da questo evento? Il tuo posto torna libero.',
+		cancelEvent: 'Annulla edizione',
+		cancelConfirm:
+			"Vuoi annullare questa edizione? Non assegnerà punti e nessuno potrà più registrare risultati. L'operazione non si può annullare.",
 		projectionFirst: "Sei primo nell'edizione",
 		projectionOther: "Sei {{position}}° nell'edizione",
 		projectionDetail: 'Difendi {{defending}} · ora prenderesti {{projected}}',
