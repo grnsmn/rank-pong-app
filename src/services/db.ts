@@ -1849,6 +1849,12 @@ export const dbService = {
 			if (!slot) throw new Error('Slot non trovato')
 			if (slot.match_id) throw new Error('Questa partita è già stata registrata')
 
+			const ev = readMock<EventRow>(EV.events).find(x => x.id === slot.event_id)
+			if (!ev) throw new Error('Evento non trovato')
+			if (ev.status !== 'in_progress') {
+				throw new Error('Questa edizione non accetta risultati')
+			}
+
 			const matches = readMock<MatchWithSets>('rp_matches')
 			const m = matches.find(x => x.id === matchId)
 			if (!m) throw new Error('Match non trovato')
