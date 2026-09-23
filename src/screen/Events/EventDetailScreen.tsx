@@ -74,17 +74,19 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack, onPlayerSe
 	// Senza risultati la classifica non dice nulla: l'ordine e' solo spareggio ELO.
 	const hasResults = (event.matches_played ?? 0) > 0
 
-	const subtitle = completed
-		? t('events.detailCompleted', { count: event.matches_total })
-		: event.status === 'in_progress'
-			? t('events.detailInProgress', {
-					played: event.matches_played,
-					total: event.matches_total,
-				})
-			: t('events.detailOpen', {
-					accepted: accepted.length,
-					total: event.participants_count,
-				})
+	const subtitle = cancelled
+		? t('events.detailCancelled')
+		: completed
+			? t('events.detailCompleted', { count: event.matches_total })
+			: event.status === 'in_progress'
+				? t('events.detailInProgress', {
+						played: event.matches_played,
+						total: event.matches_total,
+					})
+				: t('events.detailOpen', {
+						accepted: accepted.length,
+						total: event.participants_count,
+					})
 
 	const runAction = async (action: () => Promise<void>) => {
 		setIsActing(true)

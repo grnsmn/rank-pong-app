@@ -312,6 +312,7 @@ const it = {
 		detailInProgress: 'In corso · {{played}} di {{total}} partite',
 		detailCompleted: 'Concluso · {{count}} partite',
 		detailOpen: 'Iscrizioni aperte · {{accepted}} di {{total}} posti',
+		detailCancelled: 'Edizione annullata',
 		ifEndedNow: 'Se finisse ora',
 		defending: 'Difendi',
 		placement: '{{position}}° posto',
