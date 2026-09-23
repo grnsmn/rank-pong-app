@@ -108,6 +108,8 @@ export const MatchGrid: React.FC<Props> = ({
 					// il ramo confirmed è già uscito sopra.
 					const pending = !!match
 					// Chi ha registrato risulta già confermato: tocca all'altro.
+					// Senza onConfirm l'edizione non accetta più risposte (conclusa o
+					// annullata): la riga resta leggibile ma senza bottoni morti.
 					const waitingForMe =
 						!!match &&
 						match.status === 'pending' &&
@@ -123,7 +125,7 @@ export const MatchGrid: React.FC<Props> = ({
 						>
 							{label}
 							{pending ? (
-								waitingForMe ? (
+								waitingForMe && onConfirm ? (
 									<span className="flex gap-1 justify-end">
 										<button
 											onClick={() => onConfirm?.(slot)}
