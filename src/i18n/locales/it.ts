@@ -24,6 +24,7 @@ const it = {
 		won: 'Vinto',
 		lost: 'Perso',
 		invalid: 'Non valido',
+		back: 'Indietro',
 	},
 	playerType: {
 		amateur: 'Amatore',
@@ -303,7 +304,11 @@ const it = {
 		alreadyIn: 'Sei iscritto',
 		leave: 'Esci',
 		leaveConfirm: 'Vuoi uscire da questo evento? Il tuo posto torna libero.',
+		leaveTitle: "Uscire dall'evento?",
+		leaveAction: 'Sì, esci',
 		cancelEvent: 'Annulla edizione',
+		cancelTitle: "Annullare l'edizione?",
+		cancelAction: 'Sì, annulla',
 		cancelledBanner: 'Edizione annullata: non assegna punti e non accetta nuovi risultati.',
 		cancelConfirm:
 			"Vuoi annullare questa edizione? Non assegnerà punti e nessuno potrà più registrare risultati. L'operazione non si può annullare.",

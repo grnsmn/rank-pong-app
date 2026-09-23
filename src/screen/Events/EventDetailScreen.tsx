@@ -10,6 +10,7 @@ import { StandingsTable } from './StandingsTable'
 import { DefenceTable } from './DefenceTable'
 import { MatchGrid } from './MatchGrid'
 import { RecordResultModal } from './RecordResultModal'
+import { ConfirmModal } from './ConfirmModal'
 import { PointsPills } from './PointsPills'
 import { deltaColor, formatDelta, isOrganizer, myStanding, participantStatus } from './eventHelpers'
 
@@ -42,6 +43,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack, onPlayerSe
 	} = useModalState<EventMatchSlot>()
 
 	const [actionError, setActionError] = useState<string | null>(null)
+	const [confirm, setConfirm] = useState<'leave' | 'cancel' | null>(null)
 	const [isActing, setIsActing] = useState(false)
 
 	// Iscrizioni e risultati arrivano dagli altri giocatori: senza un
@@ -286,11 +288,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack, onPlayerSe
 									{t('events.alreadyIn')}
 								</span>
 								<button
-									onClick={() => {
-										if (window.confirm(t('events.leaveConfirm'))) {
-											runAction(() => dbService.leaveEvent(event.id))
-										}
-									}}
+									onClick={() => setConfirm('leave')}
 									disabled={isActing}
 									className="btn btn-ghost btn-xs h-7 px-2.5 rounded-xl text-xs font-bold text-error hover:bg-error/10"
 								>
@@ -410,11 +408,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack, onPlayerSe
 				    sono stati assegnati. Da 'completed' l'RPC rifiuta comunque. */}
 				{organizer && (event.status === 'open' || event.status === 'in_progress') && (
 					<button
-						onClick={() => {
-							if (window.confirm(t('events.cancelConfirm'))) {
-								runAction(() => dbService.cancelEvent(event.id))
-							}
-						}}
+						onClick={() => setConfirm('cancel')}
 						disabled={isActing}
 						className="btn btn-ghost w-full font-bold rounded-2xl border border-error/40 bg-error/5 text-error hover:bg-error/15"
 					>
@@ -423,6 +417,38 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack, onPlayerSe
 					</button>
 				)}
 			</div>
+
+			{confirm === 'leave' && (
+				<ConfirmModal
+					icon={LogOut}
+					danger
+					title={t('events.leaveTitle')}
+					message={t('events.leaveConfirm')}
+					confirmLabel={t('events.leaveAction')}
+					isSubmitting={isActing}
+					onCancel={() => setConfirm(null)}
+					onConfirm={async () => {
+						await runAction(() => dbService.leaveEvent(event.id))
+						setConfirm(null)
+					}}
+				/>
+			)}
+
+			{confirm === 'cancel' && (
+				<ConfirmModal
+					icon={Ban}
+					danger
+					title={t('events.cancelTitle')}
+					message={t('events.cancelConfirm')}
+					confirmLabel={t('events.cancelAction')}
+					isSubmitting={isActing}
+					onCancel={() => setConfirm(null)}
+					onConfirm={async () => {
+						await runAction(() => dbService.cancelEvent(event.id))
+						setConfirm(null)
+					}}
+				/>
+			)}
 
 			{recordSlot && (
 				<RecordResultModal
