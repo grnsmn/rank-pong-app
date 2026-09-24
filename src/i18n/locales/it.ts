@@ -205,6 +205,12 @@ const it = {
 		errorNoPlayer1: 'Seleziona il Giocatore 1',
 		errorSamePlayers: 'I due giocatori devono essere diversi',
 		vsLabel: 'vs',
+		arbiterFirstTo: 'Vince chi arriva a {{count}} set',
+		arbiterLeading: '{{name}} in vantaggio',
+		arbiterMatchPoint: '{{name}} a un set dalla vittoria',
+		arbiterTied: 'Parità',
+		arbiterDecider: 'Set decisivo',
+		arbiterWinner: '{{name}} vince {{score}}',
 	},
 	playerProfile: {
 		title: 'Profilo Giocatore',

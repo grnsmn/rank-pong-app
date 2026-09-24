@@ -9,6 +9,8 @@ import { useSessionState } from '../../hooks/useSessionState'
 import { AlertTriangle, CheckCircle2, Check, Scale, Handshake } from 'lucide-react'
 import { ToggleCard } from './ToggleCard'
 import { PlayerPicker } from './PlayerPicker'
+import { SetRow } from './SetRow'
+import { Scoreboard } from './Scoreboard'
 
 interface SetInput {
 	score1: string
@@ -414,90 +416,60 @@ export const NewMatchScreen: React.FC = () => {
 
 					{playersSelected && (
 						<div className="p-4 rounded-2xl bg-slate-900/60 shadow-md shadow-black/20 space-y-4">
-							<div className="flex justify-between items-center pb-2 border-b border-white/5">
-								<span className="text-xs font-bold text-slate-300 tracking-wide">
-									{t('newMatch.stepScores')}
-								</span>
-								<span className="text-[10px] text-slate-500 font-semibold uppercase">
-									{isArbitratorMode
-										? `${selectedPlayer1?.display_name.split(' ')[0]} ${t('newMatch.vsLabel')} ${selectedOpponent?.display_name.split(' ')[0]}`
-										: `${t('newMatch.youVs')} ${selectedOpponent?.display_name.split(' ')[0]}`}
-								</span>
-							</div>
+							{isArbitratorMode ? (
+								<Scoreboard
+									player1={selectedPlayer1}
+									player2={selectedOpponent}
+									setsWonP1={status.setsWonP1}
+									setsWonP2={status.setsWonP2}
+									targetWins={bestOf === 3 ? 2 : 3}
+									matchFinished={status.matchFinished}
+									excessSets={status.excessSets}
+								/>
+							) : (
+								<div className="flex justify-between items-center pb-2 border-b border-white/5">
+									<span className="text-xs font-bold text-slate-300 tracking-wide">
+										{t('newMatch.stepScores')}
+									</span>
+									<span className="text-[10px] text-slate-500 font-semibold uppercase">
+										{`${t('newMatch.youVs')} ${selectedOpponent?.display_name.split(' ')[0]}`}
+									</span>
+								</div>
+							)}
 
 							<div className="space-y-3.5">
 								{sets.map((set, index) => {
-									const s1 = parseInt(set.score1)
-									const s2 = parseInt(set.score2)
-									const setVal = validateSet(s1, s2)
-
+									const setVal = validateSet(
+										parseInt(set.score1),
+										parseInt(set.score2)
+									)
 									return (
-										<div
+										<SetRow
 											key={index}
-											className="flex items-center gap-3 bg-slate-950/40 p-2.5 rounded-xl"
-										>
-											<span className="text-xs font-black text-slate-400 w-12 shrink-0">
-												{t('common.set')} {index + 1}
-											</span>
-
-											<input
-												type="text"
-												pattern="\d*"
-												placeholder={
-													isArbitratorMode
-														? (selectedPlayer1?.display_name.split(
-																' '
-															)[0] ?? 'P1')
-														: t('common.you')
-												}
-												className="input input-sm w-full bg-slate-950 border-none rounded-xl focus:ring-2 focus:ring-primary/50 focus:outline-none text-center font-bold text-sm h-9"
-												value={set.score1}
-												onChange={e =>
-													handleSetChange(index, 1, e.target.value)
-												}
-												required
-											/>
-
-											<span className="text-slate-500 font-black text-sm">
-												-
-											</span>
-
-											<input
-												type="text"
-												pattern="\d*"
-												placeholder={
-													isArbitratorMode
-														? (selectedOpponent?.display_name.split(
-																' '
-															)[0] ?? 'P2')
-														: t('common.opponent')
-												}
-												className="input input-sm w-full bg-slate-950 border-none rounded-xl focus:ring-2 focus:ring-primary/50 focus:outline-none text-center font-bold text-sm h-9"
-												value={set.score2}
-												onChange={e =>
-													handleSetChange(index, 2, e.target.value)
-												}
-												required
-											/>
-
-											<div className="w-16 shrink-0 text-center">
-												{set.score1 !== '' &&
-													set.score2 !== '' &&
-													(setVal.isValid ? (
-														<span
-															className={`text-[10px] font-black uppercase ${setVal.winner === 1 ? 'text-success' : 'text-error'}`}
-														>
-															{setVal.winner === 1
-																? t('common.won')
-																: t('common.lost')}
-														</span>
-													) : (
-														<span className="text-[9px] text-warning font-semibold">
-															{t('common.invalid')}
-														</span>
-													))}
-											</div>
-										</div>
+											index={index}
+											score1={set.score1}
+											score2={set.score2}
+											isValid={setVal.isValid}
+											winner={setVal.winner}
+											isArbitratorMode={isArbitratorMode}
+											placeholder1={
+												isArbitratorMode
+													? (selectedPlayer1?.display_name.split(
+															' '
+														)[0] ?? 'P1')
+													: t('common.you')
+											}
+											placeholder2={
+												isArbitratorMode
+													? (selectedOpponent?.display_name.split(
+															' '
+														)[0] ?? 'P2')
+													: t('common.opponent')
+											}
+											onChange={(player, value) =>
+												handleSetChange(index, player, value)
+											}
+										/>
 									)
 								})}
 							</div>
@@ -537,14 +509,10 @@ export const NewMatchScreen: React.FC = () => {
 						</div>
 					)}
 
-					{playersSelected && (
+					{playersSelected && !isArbitratorMode && (
 						<div className="p-4 rounded-2xl bg-slate-900/60 shadow-md shadow-black/20 space-y-2">
 							<div className="flex justify-between items-center text-xs">
-								<span>
-									{isArbitratorMode
-										? `${t('newMatch.opponentSets')} ${selectedPlayer1?.display_name.split(' ')[0]}:`
-										: t('newMatch.yourSets')}
-								</span>
+								<span>{t('newMatch.yourSets')}</span>
 								<span className="font-extrabold text-success">
 									{status.setsWonP1}
 								</span>
