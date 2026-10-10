@@ -20,6 +20,7 @@ src/
 supabase/
   config.toml       # Supabase CLI project config
   migrations/       # Versioned schema changes (source of truth)
+  seed.sql          # Test users + matches, loaded only into the LOCAL stack
 supabase-schema.sql # Frozen baseline: schema as of migration adoption
 ```
 
@@ -60,11 +61,84 @@ Schema changes are **versioned migration files in the repo**, applied with the S
 - **Additive first, destructive much later.** The frontend is a SPA: users keep running the previously loaded bundle after a deploy. To rename or remove a column, add the new one and ship the frontend first, then drop the old one in a later migration.
 - Commit the migration file in the same commit as the code that depends on it.
 - **Commit before applying; push to `origin` before applying to production.** `db push` records only the migration's _version_ in the remote history table, never its SQL — so a migration applied but not committed leaves a database claiming to have run something whose source exists nowhere. Pushing to `origin` before touching production means production never holds changes that only one machine knows about.
-- **Two projects, one shared history.** DEV and PROD both draw from `supabase/migrations/`. A migration is pushed to DEV first, verified there, and only then pushed to PROD. Switching target means re-running `supabase link` — always check `cat supabase/.temp/project-ref` before a push and state which project it resolves to.
+- **Two environments: LOCAL and PROD.** Development runs against the local Supabase stack in Docker (`supabase start`); there is no cloud DEV project any more. A migration is verified locally first (`supabase db reset --local` replays every migration plus the seed from scratch), and only then pushed to PROD. The CLI link (`supabase/.temp/project-ref`) now only ever points at PROD — check it before any `db push` and state which project it resolves to.
+- **Env files.** `.env.development` → local stack (`npm run dev`). `.env.production` → PROD (`npm run build`; Netlify uses its dashboard vars). `.env` stays **empty**: Vite loads it in every mode, so PROD credentials there would silently leak into development.
 
 Full procedure — first-time setup, writing a migration, and repairing an out-of-sync history — lives in the `supabase-migrations` skill (`.claude/skills/supabase-migrations/SKILL.md`). Invoke it for any schema work; it also carries the safety rules for operating against the production database.
 
 **Never run `supabase db reset` against the remote project** — it drops all user data. Resets are `--local` only.
+
+## Daily workflow — working on a new feature
+
+Run these in order. Docker Desktop must be running.
+
+**1. Start the environment** (each work session)
+
+```bash
+supabase start
+```
+
+```bash
+npm run dev
+```
+
+App on http://localhost:5173, Supabase Studio (DB browser) on http://127.0.0.1:54323, captured auth emails on http://127.0.0.1:54324. Test accounts and their password are listed at the top of `supabase/seed.sql`.
+
+**2. Create a branch**
+
+```bash
+git checkout -b feat/<short-name>
+```
+
+**3. Only if the feature changes the DB schema** — create a migration, write the SQL, apply it locally:
+
+```bash
+supabase migration new <short_snake_case_name>
+```
+
+```bash
+supabase migration up --local
+```
+
+Test in the app. To restart from a clean DB (all migrations + seed, local only):
+
+```bash
+supabase db reset --local
+```
+
+If the new tables need test data, add it to `supabase/seed.sql`.
+
+**4. Commit and push** (migration file in the same commit as the code that uses it)
+
+```bash
+git add -A && git commit -m "feat(<scope>): <description>"
+```
+
+```bash
+git push -u origin feat/<short-name>
+```
+
+**5. Release** — merge to `main` (Netlify deploys the frontend). If there is a migration, apply it to PROD — after it is on `origin`, and preferably before the frontend that needs it goes live:
+
+```bash
+cat supabase/.temp/project-ref
+```
+
+```bash
+supabase db push --dry-run
+```
+
+```bash
+supabase db push
+```
+
+The dry run must list only the new migration(s). The real push is run by the user (see the `supabase-migrations` skill).
+
+**6. End of session** (data is kept between restarts)
+
+```bash
+supabase stop
+```
 
 ## Component architecture — progressive decomposition
 

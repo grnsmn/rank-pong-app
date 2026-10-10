@@ -230,8 +230,12 @@ supabase migration repair --status applied <existing_baseline_version>
 6. Verify exactly as in A4/A5: `migration list` must show the same single version on both LOCAL
    and REMOTE, and `db push --dry-run` must report nothing to apply.
 
-From this point the two projects share one history. A new migration is written once, pushed to
-DEV first, and pushed to PROD only once it has proven itself there.
+From this point the two projects share one history.
+
+> **Current setup (Oct 2026):** the cloud DEV project has been retired. Development uses the
+> local Docker stack (`supabase start`), which builds its database from `supabase/migrations/`
+> plus `supabase/seed.sql`. The only remote project is PROD, so the CLI link always resolves to
+> it. A new migration is proven locally (Task B) and then pushed to PROD.
 
 ## Task B — Write a new migration
 
@@ -247,19 +251,40 @@ Name it after the change: `add_events_table`, `fix_elo_kfactor_student`. Never `
 
 2. Write the SQL in the generated file, following the conventions below.
 
-3. Dry run, read the output, confirm only the intended file is listed:
+3. Prove it locally — both are local-only and Claude-run:
+
+```bash
+supabase migration up --local
+```
+
+```bash
+supabase db reset --local
+```
+
+`migration up --local` applies just the new file to the running local database; `db reset --local`
+then replays the whole set plus `supabase/seed.sql` from scratch, proving the chain is coherent
+and the seed still loads. Exercise the feature in the app (`npm run dev` points at the local
+stack). If the change needs test data, extend `supabase/seed.sql`.
+
+4. Commit and push to `origin`, then confirm the CLI link before touching PROD:
+
+```bash
+cat supabase/.temp/project-ref
+```
+
+5. Dry run, read the output, confirm only the intended file is listed:
 
 ```bash
 supabase db push --dry-run
 ```
 
-4. Hand the real push to the user (rule 2):
+6. Hand the real push to the user (rule 2):
 
 ```bash
 supabase db push
 ```
 
-5. **Verify the effect, not the history row.** A version appearing in
+7. **Verify the effect, not the history row.** A version appearing in
    `supabase_migrations.schema_migrations` is not proof that its SQL ran. Observed on
    CLI 2.117: two migrations that were no-ops against one project (dropping a function absent
    there, setting a default already at that value) ended up recorded as applied on it without
@@ -268,7 +293,7 @@ supabase db push
    confirm the migration actually did what it claims: re-dump the target schema and check for
    the object, column, default or policy the migration was supposed to change.
 
-6. Commit the migration file in the same commit as the code that depends on it.
+The migration file is committed in the same commit as the code that depends on it.
 
 ### Migration writing conventions
 
@@ -324,6 +349,7 @@ against the local database — the only safe way to verify that the migration se
 | `supabase migration list`                     | `supabase db push` (real)                   |
 | `supabase db push --dry-run`                  | `supabase migration repair`                 |
 | `supabase db reset --local`, `supabase start` |                                             |
+| `supabase migration up --local`               |                                             |
 
 When handing a command over: one command per bash block, say what it changes, and say what
 output confirms success.
