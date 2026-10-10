@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Check, Crown, LogOut, Trophy, Zap } from 'lucide-react'
+import { ArrowLeft, Ban, Check, Crown, LogOut, Trophy, Zap } from 'lucide-react'
 import { dbService, type EventMatchSlot } from '../../services/db'
 import { useAppStore } from '../../store/useAppStore'
 import { useDataFetch } from '../../hooks/useDataFetch'
@@ -10,6 +10,7 @@ import { StandingsTable } from './StandingsTable'
 import { DefenceTable } from './DefenceTable'
 import { MatchGrid } from './MatchGrid'
 import { RecordResultModal } from './RecordResultModal'
+import { ConfirmModal } from './ConfirmModal'
 import { PointsPills } from './PointsPills'
 import { deltaColor, formatDelta, isOrganizer, myStanding, participantStatus } from './eventHelpers'
 
@@ -42,6 +43,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack, onPlayerSe
 	} = useModalState<EventMatchSlot>()
 
 	const [actionError, setActionError] = useState<string | null>(null)
+	const [confirm, setConfirm] = useState<'leave' | 'cancel' | null>(null)
 	const [isActing, setIsActing] = useState(false)
 
 	// Iscrizioni e risultati arrivano dagli altri giocatori: senza un
@@ -67,20 +69,26 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack, onPlayerSe
 	const mine = myStanding(event.standings, currentUser?.id)
 	const accepted = event.participants.filter(p => p.status === 'accepted')
 	const completed = event.status === 'completed'
+	const cancelled = event.status === 'cancelled'
+	// Solo un'edizione in corso accetta risultati: conclusa i punti sono gia'
+	// assegnati, annullata non ne assegnera' mai.
+	const acceptsResults = event.status === 'in_progress'
 	// Senza risultati la classifica non dice nulla: l'ordine e' solo spareggio ELO.
 	const hasResults = (event.matches_played ?? 0) > 0
 
-	const subtitle = completed
-		? t('events.detailCompleted', { count: event.matches_total })
-		: event.status === 'in_progress'
-			? t('events.detailInProgress', {
-					played: event.matches_played,
-					total: event.matches_total,
-				})
-			: t('events.detailOpen', {
-					accepted: accepted.length,
-					total: event.participants_count,
-				})
+	const subtitle = cancelled
+		? t('events.detailCancelled')
+		: completed
+			? t('events.detailCompleted', { count: event.matches_total })
+			: event.status === 'in_progress'
+				? t('events.detailInProgress', {
+						played: event.matches_played,
+						total: event.matches_total,
+					})
+				: t('events.detailOpen', {
+						accepted: accepted.length,
+						total: event.participants_count,
+					})
 
 	const runAction = async (action: () => Promise<void>) => {
 		setIsActing(true)
@@ -160,6 +168,15 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack, onPlayerSe
 				{actionError && (
 					<div className="alert alert-error text-sm py-2 px-3 shadow-md">
 						<span>{actionError}</span>
+					</div>
+				)}
+
+				{cancelled && (
+					<div className="flex items-center gap-2.5 p-3.5 rounded-2xl bg-error/[0.08] border border-error/30">
+						<Ban className="w-4 h-4 text-error shrink-0" />
+						<span className="text-xs leading-snug text-error/90">
+							{t('events.cancelledBanner')}
+						</span>
 					</div>
 				)}
 
@@ -271,11 +288,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack, onPlayerSe
 									{t('events.alreadyIn')}
 								</span>
 								<button
-									onClick={() => {
-										if (window.confirm(t('events.leaveConfirm'))) {
-											runAction(() => dbService.leaveEvent(event.id))
-										}
-									}}
+									onClick={() => setConfirm('leave')}
 									disabled={isActing}
 									className="btn btn-ghost btn-xs h-7 px-2.5 rounded-xl text-xs font-bold text-error hover:bg-error/10"
 								>
@@ -320,7 +333,8 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack, onPlayerSe
 							<StandingsTable
 								standings={event.standings}
 								currentUserId={currentUser?.id}
-								hasResults={hasResults}
+								showProjection={!cancelled}
+								hasResults={hasResults && !cancelled}
 								onPlayerSelect={onPlayerSelect}
 							/>
 						</div>
@@ -333,14 +347,21 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack, onPlayerSe
 						currentUserId={currentUser?.id}
 						bestOf={event.best_of}
 						isActing={isActing}
-						onRecord={completed ? undefined : slot => openRecord(slot)}
-						onConfirm={slot =>
-							runAction(async () => {
-								await dbService.confirmMatchAsPlayer(slot.match_id!)
-								await refreshProfile()
-							})
+						onRecord={acceptsResults ? slot => openRecord(slot) : undefined}
+						onConfirm={
+							acceptsResults
+								? slot =>
+										runAction(async () => {
+											await dbService.confirmMatchAsPlayer(slot.match_id!)
+											await refreshProfile()
+										})
+								: undefined
 						}
-						onReject={slot => runAction(() => dbService.rejectEventMatch(slot.id))}
+						onReject={
+							acceptsResults
+								? slot => runAction(() => dbService.rejectEventMatch(slot.id))
+								: undefined
+						}
 					/>
 				)}
 
@@ -382,7 +403,52 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack, onPlayerSe
 						</span>
 					</div>
 				</div>
+
+				{/* Annullamento: solo l'organizzatore, e solo finche' i punti non
+				    sono stati assegnati. Da 'completed' l'RPC rifiuta comunque. */}
+				{organizer && (event.status === 'open' || event.status === 'in_progress') && (
+					<button
+						onClick={() => setConfirm('cancel')}
+						disabled={isActing}
+						className="btn btn-ghost w-full font-bold rounded-2xl border border-error/40 bg-error/5 text-error hover:bg-error/15"
+					>
+						<Ban className="w-4 h-4" />
+						{t('events.cancelEvent')}
+					</button>
+				)}
 			</div>
+
+			{confirm === 'leave' && (
+				<ConfirmModal
+					icon={LogOut}
+					danger
+					title={t('events.leaveTitle')}
+					message={t('events.leaveConfirm')}
+					confirmLabel={t('events.leaveAction')}
+					isSubmitting={isActing}
+					onCancel={() => setConfirm(null)}
+					onConfirm={async () => {
+						await runAction(() => dbService.leaveEvent(event.id))
+						setConfirm(null)
+					}}
+				/>
+			)}
+
+			{confirm === 'cancel' && (
+				<ConfirmModal
+					icon={Ban}
+					danger
+					title={t('events.cancelTitle')}
+					message={t('events.cancelConfirm')}
+					confirmLabel={t('events.cancelAction')}
+					isSubmitting={isActing}
+					onCancel={() => setConfirm(null)}
+					onConfirm={async () => {
+						await runAction(() => dbService.cancelEvent(event.id))
+						setConfirm(null)
+					}}
+				/>
+			)}
 
 			{recordSlot && (
 				<RecordResultModal

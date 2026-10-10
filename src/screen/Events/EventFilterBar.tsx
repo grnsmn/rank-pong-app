@@ -27,6 +27,7 @@ const STATUS_OPTIONS: { key: StatusFilter; labelKey: string; active: string }[] 
 		active: 'bg-success text-slate-900',
 	},
 	{ key: 'completed', labelKey: 'events.filterCompleted', active: 'bg-slate-500 text-white' },
+	{ key: 'cancelled', labelKey: 'events.filterCancelled', active: 'bg-error text-white' },
 ]
 
 export const EventFilterBar: React.FC<Props> = ({
@@ -72,7 +73,7 @@ export const EventFilterBar: React.FC<Props> = ({
 						<button
 							key={option.key}
 							onClick={() => onStatusChange(option.key)}
-							className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+							className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all cursor-pointer ${
 								status === option.key
 									? option.active
 									: 'text-slate-500 hover:text-slate-400'
