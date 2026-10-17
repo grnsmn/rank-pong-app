@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { dbService, type Profile } from '../services/db'
 import { useDataFetch } from '../hooks/useDataFetch'
 import { useMatchStats } from '../hooks/useMatchStats'
-import { ArrowLeft, User, Percent, Flame, Calendar, Trophy, Handshake } from 'lucide-react'
+import { ArrowLeft, User, Percent, Flame, Calendar, Trophy, Handshake, Swords } from 'lucide-react'
 import { InfoTooltip } from '../components/InfoTooltip'
 import { RankingScoreCard } from '../components/RankingScoreCard'
 
@@ -231,7 +231,10 @@ export const PlayerProfileScreen: React.FC<Props> = ({ playerId, onBack }) => {
 
 								const date = new Date(match.created_at)
 								const dateStr = `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`
-								const isFriendly = match.is_friendly
+								// Le partite d'evento nascono con is_friendly = true solo per non
+								// muovere l'ELO: non sono amichevoli.
+								const isEvent = !!match.event_id
+								const isFriendly = match.is_friendly && !isEvent
 
 								return (
 									<div
@@ -259,7 +262,19 @@ export const PlayerProfileScreen: React.FC<Props> = ({ playerId, onBack }) => {
 											>
 												{playerSets}–{opponentSets}
 											</span>
-											{isFriendly ? (
+											{isEvent ? (
+												<span
+													className="badge badge-xs font-bold uppercase text-white bg-indigo-600 border-none gap-1 max-w-[9rem]"
+													title={
+														match.event_name ?? t('events.badgeEvent')
+													}
+												>
+													<Swords className="w-2 h-2 shrink-0" />
+													<span className="truncate">
+														{match.event_name ?? t('events.badgeEvent')}
+													</span>
+												</span>
+											) : isFriendly ? (
 												<span className="badge badge-xs font-bold uppercase text-white bg-emerald-600 border-none gap-1">
 													<Handshake className="w-2 h-2" />
 													{t('matches.friendlyBadge')}
