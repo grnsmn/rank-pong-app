@@ -266,6 +266,7 @@ const it = {
 		palmaresSeconds: 'Secondi',
 		palmaresThirds: 'Terzi',
 		palmaresEmpty: 'Nessun evento giocato. I trofei compariranno qui.',
+		historyRank: '{{rank}}° posto',
 		reigningChampion: 'Campione in carica',
 		historyTitle: 'Storico eventi',
 		historyActive: 'attivi',

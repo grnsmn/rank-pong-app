@@ -6,6 +6,7 @@ import { useMatchStats } from '../hooks/useMatchStats'
 import { ArrowLeft, User, Percent, Flame, Calendar, Trophy, Handshake, Swords } from 'lucide-react'
 import { InfoTooltip } from '../components/InfoTooltip'
 import { RankingScoreCard } from '../components/RankingScoreCard'
+import { PalmaresSection } from '../components/PalmaresSection'
 
 interface Props {
 	playerId: string
@@ -25,6 +26,7 @@ export const PlayerProfileScreen: React.FC<Props> = ({ playerId, onBack }) => {
 	// Stesso ranking della classifica: ELO delle partite + punti evento correnti.
 	const { data: rankingData } = useDataFetch(() => dbService.getRanking())
 	const playerRanking = (rankingData ?? []).find(r => r.id === playerId)
+	const { data: palmares } = useDataFetch(() => dbService.getPalmares(playerId))
 
 	const matches = allMatches ?? []
 
@@ -124,6 +126,8 @@ export const PlayerProfileScreen: React.FC<Props> = ({ playerId, onBack }) => {
 						eventPoints={playerRanking?.event_points ?? 0}
 					/>
 				</div>
+
+				{palmares && <PalmaresSection palmares={palmares} />}
 
 				{/* Statistiche */}
 				{stats && stats.totalMatches > 0 ? (

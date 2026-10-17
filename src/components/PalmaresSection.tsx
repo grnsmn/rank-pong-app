@@ -1,7 +1,7 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import { Crown, History, Info, Medal, Trophy } from 'lucide-react'
-import type { Palmares } from '../../services/db'
+import type { Palmares } from '../services/db'
 
 interface Props {
 	palmares: Palmares
@@ -114,7 +114,7 @@ export const PalmaresSection: React.FC<Props> = ({ palmares }) => {
 									{result.event_name}
 								</div>
 								<div className="text-[10px] text-slate-500">
-									{result.final_rank}° posto
+									{t('profile.historyRank', { rank: result.final_rank })}
 								</div>
 							</div>
 							<div className="text-right shrink-0">

@@ -18,7 +18,7 @@ import {
 	ChevronDown,
 } from 'lucide-react'
 import { InfoTooltip } from '../components/InfoTooltip'
-import { PalmaresSection } from './Profile/PalmaresSection'
+import { PalmaresSection } from '../components/PalmaresSection'
 import { RankingScoreCard } from '../components/RankingScoreCard'
 
 // ---------------------------------------------------------------------------
