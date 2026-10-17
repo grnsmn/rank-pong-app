@@ -5,6 +5,7 @@ import { useDataFetch } from '../hooks/useDataFetch'
 import { useMatchStats } from '../hooks/useMatchStats'
 import { ArrowLeft, User, Percent, Flame, Calendar, Trophy, Handshake } from 'lucide-react'
 import { InfoTooltip } from '../components/InfoTooltip'
+import { RankingScoreCard } from '../components/RankingScoreCard'
 
 interface Props {
 	playerId: string
@@ -21,6 +22,9 @@ export const PlayerProfileScreen: React.FC<Props> = ({ playerId, onBack }) => {
 		dbService.getMatches()
 	)
 	const { data: profiles } = useDataFetch(() => dbService.getProfiles())
+	// Stesso ranking della classifica: ELO delle partite + punti evento correnti.
+	const { data: rankingData } = useDataFetch(() => dbService.getRanking())
+	const playerRanking = (rankingData ?? []).find(r => r.id === playerId)
 
 	const matches = allMatches ?? []
 
@@ -115,17 +119,10 @@ export const PlayerProfileScreen: React.FC<Props> = ({ playerId, onBack }) => {
 						{profile.age != null && ` • ${profile.age} ${t('common.years')}`}
 					</p>
 
-					<div className="mt-4 px-6 py-2.5 bg-slate-950 rounded-2xl border border-slate-800 flex flex-col items-center">
-						<span className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">
-							{t('profile.currentScore')}
-						</span>
-						<span className="text-3xl font-black text-primary">
-							{profile.elo_rating}
-						</span>
-						<span className="text-[10px] text-slate-400 font-medium">
-							{t('profile.eloRank')}
-						</span>
-					</div>
+					<RankingScoreCard
+						eloRating={profile.elo_rating}
+						eventPoints={playerRanking?.event_points ?? 0}
+					/>
 				</div>
 
 				{/* Statistiche */}

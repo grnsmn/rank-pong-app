@@ -226,8 +226,6 @@ const it = {
 	profile: {
 		title: 'Il Mio Profilo',
 		subtitle: 'Le tue statistiche atletiche e di ranking',
-		currentScore: 'Punteggio Attuale',
-		eloRank: 'Rank ELO',
 		statsTitle: 'Statistiche di Gioco',
 		matches: 'Partite',
 		matchesSubtitle: 'Giocate totali',
