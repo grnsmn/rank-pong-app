@@ -92,6 +92,8 @@ const it = {
 		statPlayers: 'Giocatori',
 		statLeader: 'Punti del leader',
 		statEventPoints: 'Punti da eventi',
+		showMore: 'Mostra altri {{count}}',
+		showMoreLeft: '({{count}} rimanenti)',
 		legendTotal: 'Punti',
 		legendElo: 'ELO delle partite',
 		legendEvents: 'punti dei tornei',

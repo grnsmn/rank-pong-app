@@ -1,6 +1,6 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { MapPin, Handshake, Swords, ArrowUpRight } from 'lucide-react'
+import { MapPin, Handshake, Swords, ArrowUpRight, ChevronDown } from 'lucide-react'
 import { dbService } from '../../services/db'
 import { useDataFetch } from '../../hooks/useDataFetch'
 import { PodiumSection } from './PodiumSection'
@@ -14,6 +14,11 @@ const SKY_SPIN_JOIN_URL = 'https://skyspin-hub.netlify.app/#whatsapp'
 //   sfondo #080b10 · pannelli #111720 / #171e29 · bordi #283241
 //   rosso brand #e72a36, gradiente CTA #e32333 → #ff4851 · rosa #ffb5b9
 //   testo #f2f4f7 · testo secondario #9da9b9
+
+/** All'apertura: il podio piu' 4 righe. */
+const INITIAL_SHOWN = 7
+/** Posizioni aggiunte a ogni "Mostra altri". */
+const PAGE_SIZE = 10
 
 const ABOUT = [
 	{ key: 'live', Icon: MapPin },
@@ -33,8 +38,11 @@ export const PublicLeaderboardScreen: React.FC = () => {
 	})
 	const players = data ?? []
 
+	const [shown, setShown] = useState(INITIAL_SHOWN)
+
 	const topThree = players.slice(0, 3)
-	const rest = players.slice(3)
+	const rest = players.slice(3, shown)
+	const remaining = players.length - Math.max(shown, 3)
 	const eventPoints = players.reduce((sum, p) => sum + p.event_points, 0)
 
 	return (
@@ -106,6 +114,24 @@ export const PublicLeaderboardScreen: React.FC = () => {
 									/>
 								))}
 							</div>
+						)}
+
+						{remaining > 0 && (
+							<button
+								type="button"
+								onClick={() => setShown(n => n + PAGE_SIZE)}
+								className="btn w-full h-11 rounded-xl bg-[#111720] hover:bg-[#171e29] border border-[#283241] hover:border-[#f22932]/50 text-[#f2f4f7] font-bold gap-1.5"
+							>
+								{t('publicLeaderboard.showMore', {
+									count: Math.min(PAGE_SIZE, remaining),
+								})}
+								<ChevronDown className="w-4 h-4 text-[#ff7f86]" />
+								{remaining > PAGE_SIZE && (
+									<span className="text-xs font-semibold text-[#9da9b9]">
+										{t('publicLeaderboard.showMoreLeft', { count: remaining })}
+									</span>
+								)}
+							</button>
 						)}
 
 						{/* Come si leggono i punti */}
