@@ -4,9 +4,9 @@ import { dbService, type RankingRow } from '../services/db'
 import { useAppStore } from '../store/useAppStore'
 import { useDataFetch } from '../hooks/useDataFetch'
 import { useSearch } from '../hooks/useSearch'
-import { Trophy, Medal, Search, User } from 'lucide-react'
-import { TruncatedName } from './Leaderboard/TruncatedName'
+import { Search } from 'lucide-react'
 import { PodiumSection } from './Leaderboard/PodiumSection'
+import { RankingListItem } from './Leaderboard/RankingListItem'
 
 interface Props {
 	onPlayerSelect?: (playerId: string) => void
@@ -29,46 +29,6 @@ export const LeaderboardScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 		profiles,
 		(p, q) => p.display_name.toLowerCase().includes(q) || p.username.toLowerCase().includes(q)
 	)
-
-	const getPlayerTypeLabel = (type: string) => {
-		switch (type) {
-			case 'competitive':
-				return (
-					<span className="text-[9px] uppercase font-bold tracking-wide text-violet-400">
-						{t('playerType.competitive')}
-					</span>
-				)
-			case 'student':
-				return (
-					<span className="text-[9px] uppercase font-bold tracking-wide text-info">
-						{t('playerType.student')}
-					</span>
-				)
-			default:
-				return (
-					<span className="text-[9px] uppercase font-bold tracking-wide text-sky-400">
-						{t('playerType.amateur')}
-					</span>
-				)
-		}
-	}
-
-	const getPositionIcon = (index: number) => {
-		switch (index) {
-			case 0:
-				return <Trophy className="w-5 h-5 text-yellow-400 fill-yellow-400/20" />
-			case 1:
-				return <Medal className="w-5 h-5 text-slate-300 fill-slate-300/20" />
-			case 2:
-				return <Medal className="w-5 h-5 text-amber-600 fill-amber-600/20" />
-			default:
-				return (
-					<span className="text-slate-400 text-xs font-semibold w-5 text-center">
-						{index + 1}
-					</span>
-				)
-		}
-	}
 
 	const myPosition = profiles.findIndex(p => p.id === currentUser?.id) + 1
 
@@ -121,59 +81,12 @@ export const LeaderboardScreen: React.FC<Props> = ({ onPlayerSelect }) => {
 						{(search !== '' ? filteredProfiles : restOfPlayers).map((player, index) => {
 							const actualIndex = search !== '' ? index : index + 3
 							return (
-								<div
+								<RankingListItem
 									key={player.id}
-									className="flex items-center justify-between p-3.5 hover:bg-slate-800/30 transition-colors cursor-pointer"
-									onClick={() => onPlayerSelect?.(player.id)}
-								>
-									<div className="flex items-center gap-3 min-w-0">
-										<div className="flex items-center justify-center w-6">
-											{getPositionIcon(actualIndex)}
-										</div>
-										<div className="w-9 h-9 rounded-full overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
-											{player.avatar_url ? (
-												<img
-													src={player.avatar_url}
-													alt=""
-													className="w-full h-full object-cover"
-												/>
-											) : (
-												<User className="w-5 h-5 text-slate-400" />
-											)}
-										</div>
-										<div className="min-w-0">
-											<TruncatedName
-												text={player.display_name}
-												className="text-sm font-bold text-slate-200"
-												block
-											/>
-											<TruncatedName
-												text={`@${player.username}`}
-												className="text-[10px] text-slate-400"
-												block
-											/>
-										</div>
-									</div>
-									<div className="flex flex-col items-end shrink-0">
-										{getPlayerTypeLabel(player.player_type)}
-										<span className="text-sm font-extrabold text-slate-100">
-											{player.total_points}
-										</span>
-										<span className="text-[9px] text-slate-500">
-											{player.elo_rating}
-											{' + '}
-											<span
-												className={
-													player.event_points > 0
-														? 'text-indigo-400'
-														: 'text-slate-600'
-												}
-											>
-												{player.event_points}
-											</span>
-										</span>
-									</div>
-								</div>
+									player={player}
+									position={actualIndex + 1}
+									onSelect={onPlayerSelect}
+								/>
 							)
 						})}
 					</div>

@@ -30,6 +30,7 @@ interface EditForm {
 	display_name: string
 	age: string
 	player_type: PlayerType
+	show_in_public_ranking: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -72,6 +73,7 @@ export const ProfileScreen: React.FC = () => {
 		display_name: '',
 		age: '',
 		player_type: 'amateur',
+		show_in_public_ranking: true,
 	})
 
 	const openEditor = () => {
@@ -80,6 +82,7 @@ export const ProfileScreen: React.FC = () => {
 			display_name: currentProfile.display_name,
 			age: currentProfile.age != null ? String(currentProfile.age) : '',
 			player_type: currentProfile.player_type,
+			show_in_public_ranking: currentProfile.show_in_public_ranking !== false,
 		})
 		clearMessages()
 		setIsEditing(true)
@@ -111,6 +114,7 @@ export const ProfileScreen: React.FC = () => {
 				display_name: trimmedName,
 				age: ageNum,
 				player_type: form.player_type,
+				show_in_public_ranking: form.show_in_public_ranking,
 			})
 			setIsEditing(false)
 			showSuccess(t('profile.editSuccess'))
@@ -302,6 +306,30 @@ export const ProfileScreen: React.FC = () => {
 									<ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 pointer-events-none" />
 								</div>
 							</div>
+
+							{/* Visibilità nella classifica pubblica */}
+							<label className="flex items-start justify-between gap-3 cursor-pointer">
+								<div className="flex flex-col gap-0.5">
+									<span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+										{t('profile.editPublicRanking')}
+									</span>
+									<span className="text-[11px] text-slate-500">
+										{t('profile.editPublicRankingHint')}
+									</span>
+								</div>
+								<input
+									id="profile-edit-public-ranking"
+									type="checkbox"
+									className="toggle toggle-sm toggle-primary mt-0.5 shrink-0"
+									checked={form.show_in_public_ranking}
+									onChange={e =>
+										setForm(prev => ({
+											...prev,
+											show_in_public_ranking: e.target.checked,
+										}))
+									}
+								/>
+							</label>
 
 							{/* Messaggio di errore */}
 							{formError && (

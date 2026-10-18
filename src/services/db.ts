@@ -9,6 +9,8 @@ export interface Profile {
 	player_type: 'amateur' | 'competitive' | 'student'
 	elo_rating: number
 	created_at: string
+	/** false = nascosto dalla classifica pubblica (/ranking) */
+	show_in_public_ranking?: boolean
 }
 
 export interface Match {
@@ -152,6 +154,19 @@ export interface RankingRow extends Profile {
 	event_points: number
 	total_points: number
 }
+
+/** Riga della classifica pubblica: solo i campi che si possono mostrare a tutti. */
+export type PublicRankingRow = Pick<
+	RankingRow,
+	| 'id'
+	| 'username'
+	| 'display_name'
+	| 'avatar_url'
+	| 'player_type'
+	| 'elo_rating'
+	| 'event_points'
+	| 'total_points'
+>
 
 export interface Palmares {
 	titles: number
@@ -1412,6 +1427,7 @@ export const dbService = {
 			display_name?: string
 			age?: number | null
 			player_type?: 'amateur' | 'competitive' | 'student'
+			show_in_public_ranking?: boolean
 		}
 	): Promise<Profile> {
 		if (isSupabaseConfigured && supabase) {
@@ -1905,6 +1921,32 @@ export const dbService = {
 				'rp_matches',
 				matches.filter(x => x.id !== m.id)
 			)
+		}
+	},
+
+	/**
+	 * Classifica per chi non ha fatto login. Passa da una RPC security definer:
+	 * la vista `ranking` letta da anon avrebbe i punti evento a 0.
+	 */
+	async getPublicRanking(): Promise<PublicRankingRow[]> {
+		if (isSupabaseConfigured && supabase) {
+			const { data, error } = await supabase.rpc('get_public_ranking')
+			if (error) throw error
+			return data as PublicRankingRow[]
+		} else {
+			const ranking = await this.getRanking()
+			return ranking
+				.filter(r => r.show_in_public_ranking !== false)
+				.map(r => ({
+					id: r.id,
+					username: r.username,
+					display_name: r.display_name,
+					avatar_url: r.avatar_url,
+					player_type: r.player_type,
+					elo_rating: r.elo_rating,
+					event_points: r.event_points,
+					total_points: r.total_points,
+				}))
 		}
 	},
 

@@ -4,7 +4,7 @@ import type { Profile } from '../../services/db'
 import { TruncatedName } from './TruncatedName'
 
 interface Props {
-	topThree: Profile[]
+	topThree: Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_url'>[]
 	onPlayerSelect?: (playerId: string) => void
 }
 

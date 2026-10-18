@@ -9,6 +9,8 @@
 --   bob@rankpong.test     bob     amateur
 --   carla@rankpong.test   carla   student
 --   dario@rankpong.test   dario   amateur
+--   elena, fabio, giulia, luca, marta, nico @rankpong.test — no matches,
+--   they only fill the leaderboard (e.g. the blurred rows on /join)
 -- ============================================================
 
 -- 1. Auth users. The on_auth_user_created trigger creates the matching
@@ -29,7 +31,13 @@ from (values
   ('11111111-1111-1111-1111-111111111111'::uuid, 'alice@rankpong.test', 'alice', 'Alice Rossi',   29, 'competitive'),
   ('22222222-2222-2222-2222-222222222222'::uuid, 'bob@rankpong.test',   'bob',   'Bob Bianchi',   34, 'amateur'),
   ('33333333-3333-3333-3333-333333333333'::uuid, 'carla@rankpong.test', 'carla', 'Carla Verdi',   21, 'student'),
-  ('44444444-4444-4444-4444-444444444444'::uuid, 'dario@rankpong.test', 'dario', 'Dario Neri',    41, 'amateur')
+  ('44444444-4444-4444-4444-444444444444'::uuid, 'dario@rankpong.test', 'dario', 'Dario Neri',    41, 'amateur'),
+  ('55555555-5555-5555-5555-555555555555'::uuid, 'elena@rankpong.test', 'elena', 'Elena Galli',   26, 'competitive'),
+  ('66666666-6666-6666-6666-666666666666'::uuid, 'fabio@rankpong.test', 'fabio', 'Fabio Conti',   38, 'amateur'),
+  ('77777777-7777-7777-7777-777777777777'::uuid, 'giulia@rankpong.test', 'giulia', 'Giulia Ferri', 19, 'student'),
+  ('88888888-8888-8888-8888-888888888888'::uuid, 'luca@rankpong.test',  'luca',  'Luca Marino',   45, 'amateur'),
+  ('99999999-9999-9999-9999-999999999999'::uuid, 'marta@rankpong.test', 'marta', 'Marta Greco',   31, 'competitive'),
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid, 'nico@rankpong.test',  'nico',  'Nico Fontana',  23, 'student')
 ) as u(id, email, username, display_name, age, player_type);
 
 insert into auth.identities (
