@@ -155,12 +155,14 @@ export interface RankingRow extends Profile {
 	total_points: number
 }
 
-/** Riga della classifica pubblica: solo i campi che si possono mostrare a tutti. */
+/**
+ * Riga della classifica pubblica: solo i campi che si possono mostrare a tutti.
+ * Niente nome e cognome, chi non e' iscritto vede solo lo username.
+ */
 export type PublicRankingRow = Pick<
 	RankingRow,
 	| 'id'
 	| 'username'
-	| 'display_name'
 	| 'avatar_url'
 	| 'player_type'
 	| 'elo_rating'
@@ -1940,7 +1942,6 @@ export const dbService = {
 				.map(r => ({
 					id: r.id,
 					username: r.username,
-					display_name: r.display_name,
 					avatar_url: r.avatar_url,
 					player_type: r.player_type,
 					elo_rating: r.elo_rating,

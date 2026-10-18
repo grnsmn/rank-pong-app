@@ -5,7 +5,8 @@ import type { PublicRankingRow } from '../../services/db'
 import { TruncatedName } from './TruncatedName'
 
 interface Props {
-	player: PublicRankingRow
+	/** Senza display_name (classifica pubblica) mostra solo lo username */
+	player: PublicRankingRow & { display_name?: string }
 	/** Posizione 1-based mostrata a sinistra */
 	position: number
 	/** Assente nella classifica pubblica: la riga non e' cliccabile */
@@ -63,15 +64,17 @@ export const RankingListItem: React.FC<Props> = ({ player, position, onSelect })
 				</div>
 				<div className="min-w-0">
 					<TruncatedName
-						text={player.display_name}
+						text={player.display_name ?? `@${player.username}`}
 						className="text-sm font-bold text-slate-200"
 						block
 					/>
-					<TruncatedName
-						text={`@${player.username}`}
-						className="text-[10px] text-slate-400"
-						block
-					/>
+					{player.display_name && (
+						<TruncatedName
+							text={`@${player.username}`}
+							className="text-[10px] text-slate-400"
+							block
+						/>
+					)}
 				</div>
 			</div>
 			<div className="flex flex-col items-end shrink-0">
