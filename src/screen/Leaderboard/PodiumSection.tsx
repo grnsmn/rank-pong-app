@@ -4,7 +4,8 @@ import type { Profile } from '../../services/db'
 import { TruncatedName } from './TruncatedName'
 
 interface Props {
-	topThree: Profile[]
+	/** Senza display_name (classifica pubblica) mostra solo lo username */
+	topThree: (Pick<Profile, 'id' | 'username' | 'avatar_url'> & { display_name?: string })[]
 	onPlayerSelect?: (playerId: string) => void
 }
 
@@ -96,17 +97,19 @@ export const PodiumSection: React.FC<Props> = ({ topThree, onPlayerSelect }) => 
 						</div>
 
 						<TruncatedName
-							text={player.display_name}
+							text={player.display_name ?? `@${player.username}`}
 							className={`text-center ${cfg.nameSize} ${cfg.nameColor}`}
-							wrapperClassName="mb-0.5"
+							wrapperClassName={player.display_name ? 'mb-0.5' : 'mb-2'}
 							block
 						/>
-						<TruncatedName
-							text={`@${player.username}`}
-							className="text-center text-[10px] text-slate-400"
-							wrapperClassName="mb-2"
-							block
-						/>
+						{player.display_name && (
+							<TruncatedName
+								text={`@${player.username}`}
+								className="text-center text-[10px] text-slate-400"
+								wrapperClassName="mb-2"
+								block
+							/>
+						)}
 
 						<div
 							className={`w-full ${cfg.stepHeight} rounded-t-xl ${cfg.stepBg} flex items-start justify-center pt-1.5`}

@@ -27,6 +27,7 @@ interface AppState {
 		display_name?: string
 		age?: number | null
 		player_type?: 'amateur' | 'competitive' | 'student'
+		show_in_public_ranking?: boolean
 	}) => Promise<void>
 	requestPasswordReset: (email: string) => Promise<void>
 	updatePassword: (newPassword: string) => Promise<void>

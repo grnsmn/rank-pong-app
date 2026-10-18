@@ -83,6 +83,40 @@ const it = {
 		searchPlaceholder: 'Cerca giocatore...',
 		empty: 'Nessun giocatore registrato o trovato.',
 	},
+	publicLeaderboard: {
+		badge: 'Community Sky Spin · Catania',
+		titleLead: 'Classifica',
+		titleAccent: 'Sky Spin',
+		subtitle:
+			'Partite vere, giocate dal vivo: ogni punto qui sotto è stato conquistato al tavolo.',
+		statPlayers: 'Giocatori',
+		statLeader: 'Punti del leader',
+		statEventPoints: 'Punti da eventi',
+		showMore: 'Mostra altri {{count}}',
+		showMoreLeft: '({{count}} rimanenti)',
+		legendTotal: 'Punti',
+		legendElo: 'ELO delle partite',
+		legendEvents: 'punti dei tornei',
+		aboutKicker: 'Oltre la classifica',
+		aboutTitle: "Cos'è Sky Spin",
+		about: {
+			live: {
+				title: 'Si gioca dal vivo, a Catania',
+				text: 'Niente partite online: ci si sfida al tavolo e il risultato lo confermano entrambi.',
+			},
+			closed: {
+				title: 'Una community che si conosce',
+				text: 'Si entra su richiesta, per giocare con persone vicine e incontrarsi davvero.',
+			},
+			events: {
+				title: 'Tornei ed eventi',
+				text: 'Gironi e tornei della community: i piazzamenti valgono punti in classifica.',
+			},
+		},
+		ctaText: 'Vuoi giocare con noi?',
+		ctaHint: "L'ingresso è su richiesta",
+		ctaButton: "Richiedi l'accesso",
+	},
 	matches: {
 		title: 'Partite e Richieste',
 		pendingTitle: 'Richieste in Sospeso',
@@ -254,6 +288,9 @@ const it = {
 		editAge: 'Età',
 		editAgePlaceholder: 'es. 25',
 		editPlayerType: 'Tipo Giocatore',
+		editPublicRanking: 'Visibile nella classifica pubblica',
+		editPublicRankingHint:
+			'La classifica è consultabile anche da chi non è iscritto. Se la disattivi resti visibile solo agli iscritti.',
 		editSave: 'Salva Modifiche',
 		editCancel: 'Annulla',
 		editSaving: 'Salvataggio...',

@@ -13,6 +13,7 @@ import { NewMatchScreen } from './screen/NewMatch/NewMatchScreen'
 import { ProfileScreen } from './screen/ProfileScreen'
 import { EventsScreen } from './screen/Events/EventsScreen'
 import { PlayerProfileScreen } from './screen/PlayerProfileScreen'
+import { PublicLeaderboardScreen } from './screen/Leaderboard/PublicLeaderboardScreen'
 import { PingPongLoader } from './components/PingPongLoader'
 
 // Icone
@@ -88,6 +89,10 @@ export const App: React.FC = () => {
 			return () => clearInterval(interval)
 		}
 	}, [currentUser, activeTab])
+
+	// Pagine pubbliche: accessibili senza login, anche da chi e' loggato.
+	const publicPath = window.location.pathname.replace(/\/$/, '')
+	if (publicPath === '/ranking') return <PublicLeaderboardScreen />
 
 	if (isLoading) {
 		return (
